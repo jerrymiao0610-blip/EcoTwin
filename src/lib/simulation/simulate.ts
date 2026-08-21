@@ -26,6 +26,16 @@ export function simulateClassroomEnergy(
   const area = nonNegative(config.roomAreaM2);
   const occupants = nonNegative(config.occupants);
   const hours = nonNegative(config.operatingHoursPerDay);
+  const operatingDaysPerMonth = clamp(
+    nonNegative(config.operatingDaysPerMonth),
+    0,
+    SIMULATION_CONSTANTS.maxOperatingDaysPerMonth,
+  );
+  const operatingDaysPerYear = clamp(
+    nonNegative(config.operatingDaysPerYear),
+    0,
+    SIMULATION_CONSTANTS.maxOperatingDaysPerYear,
+  );
   const lightingLevel = clamp(config.lightingLevelPercent, 0, 100) / 100;
 
   const lightingEnergyKWh = config.lightsEnabled
@@ -54,10 +64,12 @@ export function simulateClassroomEnergy(
     : 0;
 
   const dailyEnergyKWh = lightingEnergyKWh + deviceEnergyKWh + hvacEnergyKWh;
-  const monthlyEnergyKWh = dailyEnergyKWh * SIMULATION_CONSTANTS.daysPerMonth;
-  const annualEnergyKWh = dailyEnergyKWh * SIMULATION_CONSTANTS.daysPerYear;
+  const monthlyEnergyKWh = dailyEnergyKWh * operatingDaysPerMonth;
+  const annualEnergyKWh = dailyEnergyKWh * operatingDaysPerYear;
   const carbonIntensity = nonNegative(config.carbonIntensityKgPerKWh);
   const electricityPrice = nonNegative(config.electricityPricePerKWh);
+  const dailyCO2Kg = dailyEnergyKWh * carbonIntensity;
+  const dailyCost = dailyEnergyKWh * electricityPrice;
 
   const ecoScoreBreakdown = calculateEcoScoreBreakdown(config, occupants);
 
@@ -68,12 +80,12 @@ export function simulateClassroomEnergy(
     dailyEnergyKWh,
     monthlyEnergyKWh,
     annualEnergyKWh,
-    dailyCO2Kg: dailyEnergyKWh * carbonIntensity,
-    monthlyCO2Kg: monthlyEnergyKWh * carbonIntensity,
-    annualCO2Kg: annualEnergyKWh * carbonIntensity,
-    dailyCost: dailyEnergyKWh * electricityPrice,
-    monthlyCost: monthlyEnergyKWh * electricityPrice,
-    annualCost: annualEnergyKWh * electricityPrice,
+    dailyCO2Kg,
+    monthlyCO2Kg: dailyCO2Kg * operatingDaysPerMonth,
+    annualCO2Kg: dailyCO2Kg * operatingDaysPerYear,
+    dailyCost,
+    monthlyCost: dailyCost * operatingDaysPerMonth,
+    annualCost: dailyCost * operatingDaysPerYear,
     ecoScore: clamp(100 - ecoScoreBreakdown.totalPenalty, 0, 100),
     ecoScoreBreakdown,
     assumptions: getSimulationAssumptions(),
@@ -90,12 +102,8 @@ function calculateEcoScoreBreakdown(
       nonNegative(config.lightingPowerDensityWPerM2 - 8) * 2
     : 0;
 
-  const coolingGap = nonNegative(
-    config.outsideTemperatureC - config.thermostatTemperatureC,
-  );
   const coolingPenalty = config.hvacEnabled
-    ? nonNegative(coolingGap - 4) * 3 +
-      nonNegative(24 - config.thermostatTemperatureC) * 4
+    ? nonNegative(24 - config.thermostatTemperatureC) * 4
     : 0;
 
   const powerPerOccupant = config.devicePowerW / Math.max(occupants, 1);

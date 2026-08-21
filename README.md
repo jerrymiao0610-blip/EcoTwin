@@ -17,15 +17,17 @@ const estimate = simulateClassroomEnergy(DEFAULT_CLASSROOM_CONFIG);
 ```
 
 The model calculates daily lighting, device, and HVAC electricity use, then
-scales these to 30-day monthly and 365-day annual estimates. Cost and CO2 use
-the caller-provided electricity price and carbon intensity. HVAC assumptions
-are deliberately visible in `constants.ts`: the cooling load combines outdoor
-temperature difference and occupancy heat, then divides by an illustrative COP.
+scales these using the classroom's configurable operating days (22 per month
+and 250 per year in the demo defaults). Cost and CO2 use the caller-provided
+electricity price and carbon intensity. HVAC assumptions are deliberately
+visible in `constants.ts`: the cooling load combines outdoor temperature
+difference and occupancy heat, then divides by an illustrative COP.
 
 The Eco Score is a deterministic teaching indicator: it begins at 100 and
 subtracts clear penalties for lighting above 70%, lighting density above 8 W/m²,
-cooling more than 4°C below outdoors or below 24°C, and device power above 75 W
-per occupant. It is not a sustainability certification.
+a thermostat below 24°C when HVAC is enabled, and device power above 75 W per
+occupant. Outdoor temperature affects energy use but not this score. It is not
+a sustainability certification.
 
 ## Getting Started
 

@@ -11,6 +11,10 @@ export interface ClassroomConfig {
   outsideTemperatureC: number;
   thermostatTemperatureC: number;
   operatingHoursPerDay: number;
+  /** Expected classroom operating days, constrained to a calendar-month range. */
+  operatingDaysPerMonth: number;
+  /** Expected classroom operating days, constrained to a calendar-year range. */
+  operatingDaysPerYear: number;
 
   /** 0–100, where 100 means the lighting system is used at full output. */
   lightingLevelPercent: number;
@@ -34,8 +38,8 @@ export interface EcoScoreBreakdown {
 }
 
 export interface SimulationAssumptions {
-  daysPerMonth: number;
-  daysPerYear: number;
+  maxOperatingDaysPerMonth: number;
+  maxOperatingDaysPerYear: number;
   coolingLoadWPerM2PerC: number;
   occupantHeatGainW: number;
   hvacCop: number;

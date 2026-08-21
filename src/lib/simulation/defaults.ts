@@ -7,6 +7,8 @@ export const DEFAULT_CLASSROOM_CONFIG: ClassroomConfig = {
   outsideTemperatureC: 32,
   thermostatTemperatureC: 24,
   operatingHoursPerDay: 8,
+  operatingDaysPerMonth: 22,
+  operatingDaysPerYear: 250,
 
   lightingLevelPercent: 80,
   lightingPowerDensityWPerM2: 8,

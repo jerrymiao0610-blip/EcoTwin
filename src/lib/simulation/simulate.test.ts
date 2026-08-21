@@ -36,6 +36,22 @@ describe("simulateClassroomEnergy", () => {
     expect(longDay.dailyEnergyKWh).toBeGreaterThan(shortDay.dailyEnergyKWh);
   });
 
+  it("uses the configured operating days for monthly energy, CO2, and cost", () => {
+    const result = simulate({ operatingDaysPerMonth: 18 });
+
+    expect(result.monthlyEnergyKWh).toBeCloseTo(result.dailyEnergyKWh * 18);
+    expect(result.monthlyCO2Kg).toBeCloseTo(result.dailyCO2Kg * 18);
+    expect(result.monthlyCost).toBeCloseTo(result.dailyCost * 18);
+  });
+
+  it("uses the configured operating days for annual energy, CO2, and cost", () => {
+    const result = simulate({ operatingDaysPerYear: 210 });
+
+    expect(result.annualEnergyKWh).toBeCloseTo(result.dailyEnergyKWh * 210);
+    expect(result.annualCO2Kg).toBeCloseTo(result.dailyCO2Kg * 210);
+    expect(result.annualCost).toBeCloseTo(result.dailyCost * 210);
+  });
+
   it("uses more HVAC energy when the thermostat is lowered on a hot day", () => {
     const warmerTarget = simulate({
       outsideTemperatureC: 32,
@@ -49,6 +65,33 @@ describe("simulateClassroomEnergy", () => {
     expect(coolerTarget.hvacEnergyKWh).toBeGreaterThan(
       warmerTarget.hvacEnergyKWh,
     );
+  });
+
+  it("uses more HVAC energy when outdoor weather is hotter", () => {
+    const mildDay = simulate({
+      outsideTemperatureC: 28,
+      thermostatTemperatureC: 24,
+    });
+    const hotDay = simulate({
+      outsideTemperatureC: 34,
+      thermostatTemperatureC: 24,
+    });
+
+    expect(hotDay.hvacEnergyKWh).toBeGreaterThan(mildDay.hvacEnergyKWh);
+  });
+
+  it("does not reduce Eco Score solely because outdoor weather is hotter", () => {
+    const mildDay = simulate({ outsideTemperatureC: 28 });
+    const hotDay = simulate({ outsideTemperatureC: 38 });
+
+    expect(hotDay.ecoScore).toBe(mildDay.ecoScore);
+  });
+
+  it("reduces Eco Score for a thermostat below the reasonable cooling setting", () => {
+    const reasonableTarget = simulate({ thermostatTemperatureC: 24 });
+    const lowTarget = simulate({ thermostatTemperatureC: 21 });
+
+    expect(lowTarget.ecoScore).toBeLessThan(reasonableTarget.ecoScore);
   });
 
   it("gives a more efficient configuration a higher Eco Score", () => {

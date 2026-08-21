@@ -5,8 +5,9 @@ import type { SimulationAssumptions } from "./types";
  * They make an estimate possible, but are not claims about any real building.
  */
 export const SIMULATION_CONSTANTS = {
-  daysPerMonth: 30,
-  daysPerYear: 365,
+  // Calendar bounds prevent an accidental input from producing implausible scaling.
+  maxOperatingDaysPerMonth: 31,
+  maxOperatingDaysPerYear: 366,
 
   // Approximate thermal cooling load for each m² and °C above the thermostat.
   coolingLoadWPerM2PerC: 12,
@@ -19,7 +20,8 @@ export const SIMULATION_CONSTANTS = {
 export const ECO_SCORE_FORMULA =
   "Eco Score = clamp(100 − lighting penalty − cooling penalty − device penalty, 0, 100). " +
   "Penalties increase for lighting above 70%, lighting density above 8 W/m², " +
-  "HVAC cooling more than 4°C below outdoors or below 24°C, and device power above 75 W per occupant.";
+  "a thermostat below 24°C when HVAC is enabled, and device power above 75 W per occupant. " +
+  "Outdoor temperature affects energy use, not the Eco Score.";
 
 export function getSimulationAssumptions(): SimulationAssumptions {
   return {
