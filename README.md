@@ -1,4 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EcoTwin
+
+EcoTwin is an educational classroom energy simulation for NextStep Hacks 2026.
+It provides estimates, not measured data or professional building-energy modelling.
+
+## Task 01: simulation engine
+
+The reusable engine is in `src/lib/simulation`:
+
+```ts
+import {
+  DEFAULT_CLASSROOM_CONFIG,
+  simulateClassroomEnergy,
+} from "@/lib/simulation";
+
+const estimate = simulateClassroomEnergy(DEFAULT_CLASSROOM_CONFIG);
+```
+
+The model calculates daily lighting, device, and HVAC electricity use, then
+scales these to 30-day monthly and 365-day annual estimates. Cost and CO2 use
+the caller-provided electricity price and carbon intensity. HVAC assumptions
+are deliberately visible in `constants.ts`: the cooling load combines outdoor
+temperature difference and occupancy heat, then divides by an illustrative COP.
+
+The Eco Score is a deterministic teaching indicator: it begins at 100 and
+subtracts clear penalties for lighting above 70%, lighting density above 8 W/m²,
+cooling more than 4°C below outdoors or below 24°C, and device power above 75 W
+per occupant. It is not a sustainability certification.
 
 ## Getting Started
 
