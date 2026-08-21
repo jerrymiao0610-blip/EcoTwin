@@ -162,10 +162,12 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .hvac-unit small, .device-bank small { font-size: 7px; font-weight: 800; letter-spacing: .65px; }
 .hvac-unit b { margin-top: 2px; font-size: 6px; letter-spacing: .7px; }
 .hvac-unit.active { border-color: var(--system-hvac); background: #e6f4f0; color: #236b61; box-shadow: 0 0 15px #4f9d9331; }
+.hvac-unit.active.heating { border-color: #bd8157; background: #f8eee6; color: #8a4d29; box-shadow: 0 0 15px #b9784a31; }
 .hvac-unit.idle { border-color: #9ebbb3; background: #eef4f1; color: #617a73; opacity: .88; box-shadow: none; }
 .hvac-unit.inactive { border-color: #c7d2ce; background: #e7ece9; color: #83918c; opacity: .7; box-shadow: none; }
 .airflow-paths { position: absolute; top: 76px; right: 69px; width: min(52vw, 380px); height: 100px; overflow: visible; opacity: 0; transition: opacity .22s ease; }
 .airflow-paths path { fill: none; stroke: var(--system-hvac); stroke-dasharray: 7 8; stroke-linecap: round; stroke-width: 1.4; vector-effect: non-scaling-stroke; animation: airflow-travel calc(2.9s - (var(--airflow-strength) * 1.2s)) linear infinite; }
+.airflow-paths.heating path { stroke: #b9784a; }
 .airflow-paths path:nth-child(2) { animation-delay: -.55s; opacity: .72; }
 .airflow-paths path:nth-child(3) { animation-delay: -1s; opacity: .45; }
 .airflow-paths.active { opacity: calc(.22 + (var(--airflow-strength) * .62)); }

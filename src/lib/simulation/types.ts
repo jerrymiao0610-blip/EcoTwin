@@ -32,17 +32,24 @@ export interface ClassroomConfig {
 export interface EcoScoreBreakdown {
   /** Score starts at 100; each value is a transparent penalty in score points. */
   lightingPenalty: number;
+  thermostatPenalty: number;
+  /** @deprecated Use thermostatPenalty. Retained for cooling-model consumers. */
   coolingPenalty: number;
   devicePenalty: number;
   totalPenalty: number;
 }
 
+export type HvacMode = "heating" | "cooling" | "idle" | "off";
+
 export interface SimulationAssumptions {
   maxOperatingDaysPerMonth: number;
   maxOperatingDaysPerYear: number;
+  thermalLoadWPerM2PerC: number;
+  /** @deprecated Use thermalLoadWPerM2PerC. */
   coolingLoadWPerM2PerC: number;
   occupantHeatGainW: number;
   hvacCop: number;
+  thermalBalanceToleranceW: number;
   ecoScoreFormula: string;
 }
 
@@ -50,6 +57,9 @@ export interface SimulationResult {
   lightingEnergyKWh: number;
   deviceEnergyKWh: number;
   hvacEnergyKWh: number;
+  /** Signed thermal load: positive needs cooling; negative needs heating. */
+  netThermalLoadW: number;
+  hvacMode: HvacMode;
 
   dailyEnergyKWh: number;
   monthlyEnergyKWh: number;

@@ -5,6 +5,7 @@ import {
 import type {
   ClassroomConfig,
   EcoScoreBreakdown,
+  HvacMode,
   SimulationResult,
 } from "./types";
 
@@ -15,10 +16,11 @@ const clamp = (value: number, minimum: number, maximum: number) =>
 /**
  * Calculates a deterministic, daily classroom energy estimate.
  *
- * HVAC model: thermal cooling demand is the sum of outdoor-temperature load
- * and occupant heat gain. Dividing this thermal demand by COP produces the
- * electrical energy estimate. This is intentionally an explainable teaching
- * model, not certified building-energy modelling.
+ * HVAC model: the signed thermal load combines envelope heat gain/loss with
+ * occupant heat gain. Its sign selects cooling or heating; its magnitude,
+ * divided by COP, produces the electrical energy estimate. This is
+ * intentionally an explainable teaching model, not certified building-energy
+ * modelling.
  */
 export function simulateClassroomEnergy(
   config: ClassroomConfig,
@@ -46,20 +48,17 @@ export function simulateClassroomEnergy(
     ? (nonNegative(config.devicePowerW) * hours) / 1000
     : 0;
 
-  // Outdoor cooling only applies when it is warmer outside than the target.
-  const outdoorTemperatureDifference = nonNegative(
-    config.outsideTemperatureC - config.thermostatTemperatureC,
-  );
-  const outdoorCoolingDemandKWh =
-    (outdoorTemperatureDifference *
-      area *
-      SIMULATION_CONSTANTS.coolingLoadWPerM2PerC *
-      hours) /
-    1000;
-  const occupantCoolingDemandKWh =
-    (occupants * SIMULATION_CONSTANTS.occupantHeatGainW * hours) / 1000;
+  const envelopeLoadW =
+    area *
+    SIMULATION_CONSTANTS.thermalLoadWPerM2PerC *
+    (config.outsideTemperatureC - config.thermostatTemperatureC);
+  const occupantHeatW =
+    occupants * SIMULATION_CONSTANTS.occupantHeatGainW;
+  const netThermalLoadW = envelopeLoadW + occupantHeatW;
+  const hvacMode = getHvacMode(config.hvacEnabled, netThermalLoadW);
   const hvacEnergyKWh = config.hvacEnabled
-    ? (outdoorCoolingDemandKWh + occupantCoolingDemandKWh) /
+    ? (Math.abs(netThermalLoadW) * hours) /
+      1000 /
       SIMULATION_CONSTANTS.hvacCop
     : 0;
 
@@ -71,12 +70,18 @@ export function simulateClassroomEnergy(
   const dailyCO2Kg = dailyEnergyKWh * carbonIntensity;
   const dailyCost = dailyEnergyKWh * electricityPrice;
 
-  const ecoScoreBreakdown = calculateEcoScoreBreakdown(config, occupants);
+  const ecoScoreBreakdown = calculateEcoScoreBreakdown(
+    config,
+    occupants,
+    hvacMode,
+  );
 
   return {
     lightingEnergyKWh,
     deviceEnergyKWh,
     hvacEnergyKWh,
+    netThermalLoadW,
+    hvacMode,
     dailyEnergyKWh,
     monthlyEnergyKWh,
     annualEnergyKWh,
@@ -92,25 +97,47 @@ export function simulateClassroomEnergy(
   };
 }
 
+function getHvacMode(hvacEnabled: boolean, netThermalLoadW: number): HvacMode {
+  if (!hvacEnabled) return "off";
+  if (
+    Math.abs(netThermalLoadW) <=
+    SIMULATION_CONSTANTS.thermalBalanceToleranceW
+  ) {
+    return "idle";
+  }
+  return netThermalLoadW > 0 ? "cooling" : "heating";
+}
+
 /** A small, explainable score: lower avoidable energy use means a higher score. */
 function calculateEcoScoreBreakdown(
   config: ClassroomConfig,
   occupants: number,
+  hvacMode: HvacMode,
 ): EcoScoreBreakdown {
   const lightingPenalty = config.lightsEnabled
     ? nonNegative(clamp(config.lightingLevelPercent, 0, 100) - 70) * 0.35 +
       nonNegative(config.lightingPowerDensityWPerM2 - 8) * 2
     : 0;
 
-  const coolingPenalty = config.hvacEnabled
-    ? nonNegative(24 - config.thermostatTemperatureC) * 4
-    : 0;
+  const thermostatPenalty =
+    hvacMode === "cooling"
+      ? nonNegative(24 - config.thermostatTemperatureC) * 4
+      : hvacMode === "heating"
+        ? nonNegative(config.thermostatTemperatureC - 20) * 4
+        : 0;
 
   const powerPerOccupant = config.devicePowerW / Math.max(occupants, 1);
   const devicePenalty = config.devicesEnabled
     ? nonNegative(powerPerOccupant - 75) * 0.12
     : 0;
-  const totalPenalty = lightingPenalty + coolingPenalty + devicePenalty;
+  const totalPenalty = lightingPenalty + thermostatPenalty + devicePenalty;
+  const coolingPenalty = hvacMode === "cooling" ? thermostatPenalty : 0;
 
-  return { lightingPenalty, coolingPenalty, devicePenalty, totalPenalty };
+  return {
+    lightingPenalty,
+    thermostatPenalty,
+    coolingPenalty,
+    devicePenalty,
+    totalPenalty,
+  };
 }

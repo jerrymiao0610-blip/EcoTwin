@@ -4,6 +4,7 @@ export { simulateClassroomEnergy } from "./simulate";
 export type {
   ClassroomConfig,
   EcoScoreBreakdown,
+  HvacMode,
   SimulationAssumptions,
   SimulationResult,
 } from "./types";

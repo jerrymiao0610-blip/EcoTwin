@@ -9,6 +9,17 @@ const simulate = (overrides: Partial<ClassroomConfig> = {}) =>
   simulateClassroomEnergy({ ...DEFAULT_CLASSROOM_CONFIG, ...overrides });
 
 describe("simulateClassroomEnergy", () => {
+  it("preserves the default summer classroom HVAC result and reports cooling", () => {
+    const result = simulate();
+
+    expect(result.netThermalLoadW).toBeCloseTo(8_010);
+    expect(result.hvacEnergyKWh).toBeCloseTo(21.36);
+    expect(result.hvacMode).toBe("cooling");
+    expect(result.assumptions.coolingLoadWPerM2PerC).toBe(
+      result.assumptions.thermalLoadWPerM2PerC,
+    );
+  });
+
   it("returns zero energy when every system is disabled", () => {
     const result = simulate({
       hvacEnabled: false,
@@ -19,7 +30,48 @@ describe("simulateClassroomEnergy", () => {
     expect(result.lightingEnergyKWh).toBeCloseTo(0);
     expect(result.deviceEnergyKWh).toBeCloseTo(0);
     expect(result.hvacEnergyKWh).toBeCloseTo(0);
+    expect(result.hvacMode).toBe("off");
     expect(result.dailyEnergyKWh).toBeCloseTo(0);
+  });
+
+  it("reports heating and distinct loads for meaningfully different winter conditions", () => {
+    const colder = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 16,
+    });
+    const warmer = simulate({
+      outsideTemperatureC: -4,
+      thermostatTemperatureC: 18,
+    });
+
+    expect(colder.hvacMode).toBe("heating");
+    expect(warmer.hvacMode).toBe("heating");
+    expect(colder.hvacEnergyKWh).toBeCloseTo(43.92);
+    expect(warmer.hvacEnergyKWh).toBeCloseTo(36.24);
+    expect(colder.hvacEnergyKWh).toBeGreaterThan(warmer.hvacEnergyKWh);
+  });
+
+  it("reports idle when occupant heat balances the envelope load", () => {
+    const result = simulate({
+      outsideTemperatureC: 20.875,
+      thermostatTemperatureC: 24,
+    });
+
+    expect(result.netThermalLoadW).toBeCloseTo(0);
+    expect(result.hvacEnergyKWh).toBeCloseTo(0);
+    expect(result.hvacMode).toBe("idle");
+  });
+
+  it("reports off and consumes no HVAC electricity when HVAC is disabled", () => {
+    const result = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 16,
+      hvacEnabled: false,
+    });
+
+    expect(result.netThermalLoadW).toBeLessThan(0);
+    expect(result.hvacEnergyKWh).toBe(0);
+    expect(result.hvacMode).toBe("off");
   });
 
   it("uses more lighting energy at a higher lighting level", () => {
@@ -67,6 +119,23 @@ describe("simulateClassroomEnergy", () => {
     );
   });
 
+  it("uses more heating energy when the thermostat is raised on a cold day", () => {
+    const lowerTarget = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 16,
+    });
+    const higherTarget = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 20,
+    });
+
+    expect(lowerTarget.hvacMode).toBe("heating");
+    expect(higherTarget.hvacMode).toBe("heating");
+    expect(higherTarget.hvacEnergyKWh).toBeGreaterThan(
+      lowerTarget.hvacEnergyKWh,
+    );
+  });
+
   it("uses more HVAC energy when outdoor weather is hotter", () => {
     const mildDay = simulate({
       outsideTemperatureC: 28,
@@ -87,11 +156,60 @@ describe("simulateClassroomEnergy", () => {
     expect(hotDay.ecoScore).toBe(mildDay.ecoScore);
   });
 
+  it("does not reduce Eco Score solely because winter weather is colder", () => {
+    const coldDay = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 22,
+    });
+    const colderDay = simulate({
+      outsideTemperatureC: -20,
+      thermostatTemperatureC: 22,
+    });
+
+    expect(coldDay.hvacMode).toBe("heating");
+    expect(colderDay.hvacMode).toBe("heating");
+    expect(colderDay.ecoScore).toBe(coldDay.ecoScore);
+  });
+
   it("reduces Eco Score for a thermostat below the reasonable cooling setting", () => {
     const reasonableTarget = simulate({ thermostatTemperatureC: 24 });
     const lowTarget = simulate({ thermostatTemperatureC: 21 });
 
     expect(lowTarget.ecoScore).toBeLessThan(reasonableTarget.ecoScore);
+  });
+
+  it("reduces Eco Score for a thermostat above the reasonable heating setting", () => {
+    const reasonableTarget = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 20,
+    });
+    const highTarget = simulate({
+      outsideTemperatureC: -10,
+      thermostatTemperatureC: 23,
+    });
+
+    expect(reasonableTarget.hvacMode).toBe("heating");
+    expect(highTarget.hvacMode).toBe("heating");
+    expect(highTarget.ecoScore).toBeLessThan(reasonableTarget.ecoScore);
+    expect(highTarget.ecoScoreBreakdown.coolingPenalty).toBe(0);
+  });
+
+  it("applies no thermostat penalty while HVAC is idle or off", () => {
+    const idle = simulate({
+      outsideTemperatureC: 20.875,
+      thermostatTemperatureC: 24,
+    });
+    const off = simulate({ thermostatTemperatureC: 18, hvacEnabled: false });
+
+    expect(idle.ecoScoreBreakdown.thermostatPenalty).toBe(0);
+    expect(off.ecoScoreBreakdown.thermostatPenalty).toBe(0);
+  });
+
+  it("keeps the existing lighting and device calculations unchanged", () => {
+    const result = simulate();
+
+    expect(result.lightingEnergyKWh).toBeCloseTo(3.072);
+    expect(result.deviceEnergyKWh).toBeCloseTo(14.4);
   });
 
   it("gives a more efficient configuration a higher Eco Score", () => {

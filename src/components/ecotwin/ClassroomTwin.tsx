@@ -24,7 +24,7 @@ const formatEnergy = (value: number) => value.toFixed(1);
 export function ClassroomTwin({ config, result, highlightedItems = [], feedbackKey = null, feedbackToken = 0 }: Props) {
   const occupants = config.occupants > 0 ? Math.min(12, Math.max(1, Math.round(config.occupants / 3))) : 0;
   const lightingLevel = config.lightsEnabled ? Math.min(1, Math.max(0, config.lightingLevelPercent / 100)) : 0;
-  const hvacDrawingLoad = config.hvacEnabled && result.hvacEnergyKWh > 0.005;
+  const hvacDrawingLoad = result.hvacMode === "heating" || result.hvacMode === "cooling";
   const devicesDrawingLoad = config.devicesEnabled && result.deviceEnergyKWh > 0.005;
   const lightingDrawingLoad = config.lightsEnabled && result.lightingEnergyKWh > 0.005;
   const airflowStrength = hvacDrawingLoad ? Math.min(1, Math.max(0.18, result.hvacEnergyKWh / 32)) : 0;
@@ -44,7 +44,7 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
   const occupancyFeedback = feedbackKey === "occupants" || feedbackKey === "reset";
   const roomFeedback = feedbackKey === "roomAreaM2" || occupancyFeedback;
   const temperatureFeedback = feedbackKey === "outsideTemperatureC" || feedbackKey === "thermostatTemperatureC" || feedbackKey === "reset";
-  const hvacState = !config.hvacEnabled ? "off" : hvacDrawingLoad ? "cooling" : "standby";
+  const hvacState = result.hvacMode;
   const devicesState = !config.devicesEnabled ? "off" : devicesDrawingLoad ? "drawing load" : "standby";
   const devicesStatusLabel = !config.devicesEnabled ? "off" : devicesDrawingLoad ? "load" : "standby";
   const lightingStateLabel = !config.lightsEnabled ? "off" : lightingDrawingLoad ? `${config.lightingLevelPercent}% active` : `${config.lightingLevelPercent}% standby`;
@@ -83,8 +83,8 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
         </div>
 
         <div className={`hvac-assembly${hvacFeedback ? " twin-state-feedback" : ""}`} key={`hvac-${hvacFeedback ? feedbackToken : 0}`}>
-          <div className={`hvac-unit ${!config.hvacEnabled ? "inactive" : hvacDrawingLoad ? "active" : "idle"}`}><span>≋</span><small>HVAC</small><b>{hvacState.toUpperCase()}</b></div>
-          <svg className={`airflow-paths ${hvacDrawingLoad ? "active" : "inactive"}`} aria-hidden="true" viewBox="0 0 380 100" preserveAspectRatio="none">
+          <div className={`hvac-unit ${hvacState}${hvacDrawingLoad ? " active" : hvacState === "off" ? " inactive" : ""}`}><span>≋</span><small>HVAC</small><b>{hvacState.toUpperCase()}</b></div>
+          <svg className={`airflow-paths ${hvacState} ${hvacDrawingLoad ? "active" : "inactive"}`} aria-hidden="true" viewBox="0 0 380 100" preserveAspectRatio="none">
             <path d="M374 14 C318 15 326 58 255 55 S153 22 84 53 S28 76 5 67" />
             <path d="M374 31 C330 38 318 79 248 73 S151 44 93 70 S33 91 8 84" />
             <path d="M374 48 C337 54 314 93 258 91 S175 65 121 86" />

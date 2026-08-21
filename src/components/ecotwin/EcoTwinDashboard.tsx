@@ -19,7 +19,7 @@ const breakdownInputs: Record<BreakdownCategory, (keyof ClassroomConfig)[]> = {
   Lighting: ["roomAreaM2", "operatingHoursPerDay", "lightingLevelPercent", "lightingPowerDensityWPerM2", "lightsEnabled"],
 };
 
-const scoreInputs: (keyof ClassroomConfig)[] = ["occupants", "thermostatTemperatureC", "lightingLevelPercent", "lightingPowerDensityWPerM2", "devicePowerW", "hvacEnabled", "lightsEnabled", "devicesEnabled"];
+const scoreInputs: (keyof ClassroomConfig)[] = ["roomAreaM2", "occupants", "outsideTemperatureC", "thermostatTemperatureC", "lightingLevelPercent", "lightingPowerDensityWPerM2", "devicePowerW", "hvacEnabled", "lightsEnabled", "devicesEnabled"];
 
 export function EcoTwinDashboard() {
   const [config, setConfig] = useState<ClassroomConfig>(DEFAULT_CLASSROOM_CONFIG);
