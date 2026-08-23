@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import type { ClassroomConfig, SimulationResult } from "@/lib/simulation";
+import { AnimatedNumber } from "./AnimatedNumber";
 
-type HighlightedSystem = "HVAC" | "Devices" | "Lighting";
+export type TwinSystemFocus = "HVAC" | "Devices" | "Lighting";
 type TwinFeedbackKey = keyof ClassroomConfig | "period" | "reset" | null;
 
 type TwinProperties = CSSProperties & {
@@ -14,21 +15,26 @@ type TwinProperties = CSSProperties & {
 type Props = {
   config: ClassroomConfig;
   result: SimulationResult;
-  highlightedItems?: HighlightedSystem[];
+  highlightedItems?: TwinSystemFocus[];
+  causalFocus?: TwinSystemFocus | null;
   feedbackKey?: TwinFeedbackKey;
   feedbackToken?: number;
 };
 
 const formatEnergy = (value: number) => value.toFixed(1);
 
-export function ClassroomTwin({ config, result, highlightedItems = [], feedbackKey = null, feedbackToken = 0 }: Props) {
+export function ClassroomTwin({ config, result, highlightedItems = [], causalFocus = null, feedbackKey = null, feedbackToken = 0 }: Props) {
   const occupants = config.occupants > 0 ? Math.min(12, Math.max(1, Math.round(config.occupants / 3))) : 0;
   const lightingLevel = config.lightsEnabled ? Math.min(1, Math.max(0, config.lightingLevelPercent / 100)) : 0;
   const hvacDrawingLoad = result.hvacMode === "heating" || result.hvacMode === "cooling";
   const devicesDrawingLoad = config.devicesEnabled && result.deviceEnergyKWh > 0.005;
   const lightingDrawingLoad = config.lightsEnabled && result.lightingEnergyKWh > 0.005;
-  const airflowStrength = hvacDrawingLoad ? Math.min(1, Math.max(0.18, result.hvacEnergyKWh / 32)) : 0;
-  const deviceStrength = devicesDrawingLoad ? Math.min(1, Math.max(0, config.devicePowerW / 6000)) : 0;
+  const airflowStrength = hvacDrawingLoad && result.dailyEnergyKWh > 0
+    ? Math.min(1, Math.max(0.18, result.hvacEnergyKWh / result.dailyEnergyKWh))
+    : 0;
+  const deviceStrength = devicesDrawingLoad && result.dailyEnergyKWh > 0
+    ? Math.min(1, Math.max(0.12, result.deviceEnergyKWh / result.dailyEnergyKWh))
+    : 0;
   const deviceBars = devicesDrawingLoad ? Math.max(1, Math.ceil(deviceStrength * 3)) : 0;
   const outdoorHeat = Math.min(1, Math.max(0, (config.outsideTemperatureC + 10) / 55));
   const sceneStyle: TwinProperties = {
@@ -48,17 +54,27 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
   const devicesState = !config.devicesEnabled ? "off" : devicesDrawingLoad ? "drawing load" : "standby";
   const devicesStatusLabel = !config.devicesEnabled ? "off" : devicesDrawingLoad ? "load" : "standby";
   const lightingStateLabel = !config.lightsEnabled ? "off" : lightingDrawingLoad ? `${config.lightingLevelPercent}% active` : `${config.lightingLevelPercent}% standby`;
+  const causalFocusClass = causalFocus ? ` causal-focus causal-focus-${causalFocus.toLowerCase()}` : "";
+  const hvacCausalFocus = causalFocus === "HVAC";
+  const lightingCausalFocus = causalFocus === "Lighting";
+  const devicesCausalFocus = causalFocus === "Devices";
 
   return (
     <section className="twin-panel" aria-labelledby="twin-title">
       <div className="panel-heading twin-heading">
         <div><span className="eyebrow">02 · Digital twin</span><h2 id="twin-title">Classroom digital twin</h2></div>
         <div className="twin-live-output" aria-label={`${formatEnergy(result.dailyEnergyKWh)} kilowatt-hours modeled energy per day`}>
-          <span>Current modeled load</span><strong>{formatEnergy(result.dailyEnergyKWh)} <small>kWh/day</small></strong>
+          <span>Current modeled load</span><strong><AnimatedNumber value={result.dailyEnergyKWh} /> <small>kWh/day</small></strong>
         </div>
       </div>
 
-      <div className={`room-scene ${lightingState}`} style={sceneStyle} role="img" aria-label={`Classroom twin. Outdoor temperature ${config.outsideTemperatureC} degrees Celsius. Room target ${config.thermostatTemperatureC} degrees Celsius. ${config.occupants} people. HVAC ${hvacState}. Lighting ${lightingStateLabel}. Devices ${devicesState}. Modeled energy ${formatEnergy(result.dailyEnergyKWh)} kilowatt-hours per day.`}>
+      <div className={`room-scene ${lightingState}${causalFocusClass}`} style={sceneStyle} role="img" aria-label={`Classroom twin. Outdoor temperature ${config.outsideTemperatureC} degrees Celsius. Room target ${config.thermostatTemperatureC} degrees Celsius. ${config.occupants} people. HVAC ${hvacState}. Lighting ${lightingStateLabel}. Devices ${devicesState}. Modeled energy ${formatEnergy(result.dailyEnergyKWh)} kilowatt-hours per day.`}>
+        <div className="twin-telemetry-grid" aria-hidden="true" />
+        <div className="twin-reticle" aria-hidden="true"><i /><i /><i /><i /></div>
+        <div className={`twin-focus-annunciator${causalFocus ? " active" : ""}`} role="status" aria-live="polite">
+          <span>{causalFocus ? "Recommendation focus" : "Modeled system map"}</span>
+          <strong>{causalFocus ?? hvacState.toUpperCase()}</strong>
+        </div>
         <div className="room-wall" aria-hidden="true" />
         <div className="room-ceiling" aria-hidden="true" />
         <div className="room-floor" aria-hidden="true"><i /><i /><i /></div>
@@ -77,12 +93,12 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
         <div className="thermal-guide" aria-hidden="true"><span>OUTSIDE</span><i /><b>ROOM TARGET</b></div>
         <div className="window" aria-hidden="true"><span /><i /><i /></div>
 
-        <div className={`ceiling-lights${lightingFeedback ? " twin-state-feedback" : ""}`} key={`lighting-${lightingFeedback ? feedbackToken : 0}`}>
+        <div className={`ceiling-lights${lightingFeedback ? " twin-state-feedback" : ""}${lightingCausalFocus ? " twin-causal-target" : ""}`} key={`lighting-${lightingFeedback ? feedbackToken : 0}`}>
           <span className="lighting-state-label">Lighting <b>{lightingStateLabel}</b></span>
           {[0, 1, 2].map((light) => <i className="ceiling-light" aria-hidden="true" key={light}><b /></i>)}
         </div>
 
-        <div className={`hvac-assembly${hvacFeedback ? " twin-state-feedback" : ""}`} key={`hvac-${hvacFeedback ? feedbackToken : 0}`}>
+        <div className={`hvac-assembly${hvacFeedback ? " twin-state-feedback" : ""}${hvacCausalFocus ? " twin-causal-target" : ""}`} key={`hvac-${hvacFeedback ? feedbackToken : 0}`}>
           <div className={`hvac-unit ${hvacState}${hvacDrawingLoad ? " active" : hvacState === "off" ? " inactive" : ""}`}><span>≋</span><small>HVAC</small><b>{hvacState.toUpperCase()}</b></div>
           <svg className={`airflow-paths ${hvacState} ${hvacDrawingLoad ? "active" : "inactive"}`} aria-hidden="true" viewBox="0 0 380 100" preserveAspectRatio="none">
             <path d="M374 14 C318 15 326 58 255 55 S153 22 84 53 S28 76 5 67" />
@@ -91,7 +107,7 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
           </svg>
         </div>
 
-        <div className={`thermostat${temperatureFeedback ? " twin-state-feedback" : ""}`} key={`target-${temperatureFeedback ? feedbackToken : 0}`}><span>ROOM TARGET</span><b>{config.thermostatTemperatureC}°C</b></div>
+        <div className={`thermostat${temperatureFeedback ? " twin-state-feedback" : ""}${hvacCausalFocus ? " twin-causal-target" : ""}`} key={`target-${temperatureFeedback ? feedbackToken : 0}`}><span>ROOM TARGET</span><b><AnimatedNumber value={config.thermostatTemperatureC} maximumFractionDigits={1} />°C</b></div>
 
         <div className={`desks${occupancyFeedback ? " twin-state-feedback" : ""}`} aria-hidden="true" key={`occupancy-${occupancyFeedback ? feedbackToken : 0}`}>
           {Array.from({ length: 12 }, (_, index) => (
@@ -102,19 +118,19 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
           ))}
         </div>
 
-        <div className={`device-bank ${!config.devicesEnabled ? "inactive" : devicesDrawingLoad ? "active" : "idle"}${devicesFeedback ? " twin-state-feedback" : ""}`} key={`devices-${devicesFeedback ? feedbackToken : 0}`}>
+        <div className={`device-bank ${!config.devicesEnabled ? "inactive" : devicesDrawingLoad ? "active" : "idle"}${devicesFeedback ? " twin-state-feedback" : ""}${devicesCausalFocus ? " twin-causal-target" : ""}`} key={`devices-${devicesFeedback ? feedbackToken : 0}`}>
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5" /><path d="M9 20h6M12 16v4" /></svg></span>
           <small>DEVICES {devicesStatusLabel.toUpperCase()}</small>
-          <strong>{(config.devicePowerW / 1000).toFixed(1)} kW</strong>
+          <strong><AnimatedNumber value={config.devicePowerW / 1000} /> kW</strong>
           <div className="device-level" aria-hidden="true">{[1, 2, 3].map((bar) => <i className={bar <= deviceBars ? "active" : ""} key={bar} />)}</div>
         </div>
 
         <div className="energy-trace" aria-label="Daily modeled energy by classroom system">
           <span className="trace-kicker">Daily load</span>
-          <div className={`trace-system trace-hvac${hvacFeedback ? " twin-state-feedback" : ""}`} key={`trace-hvac-${hvacFeedback ? feedbackToken : 0}`}><i /><span>HVAC</span><strong>{formatEnergy(result.hvacEnergyKWh)} <small>kWh</small></strong></div>
-          <div className={`trace-system trace-devices${devicesFeedback ? " twin-state-feedback" : ""}`} key={`trace-devices-${devicesFeedback ? feedbackToken : 0}`}><i /><span>Devices</span><strong>{formatEnergy(result.deviceEnergyKWh)} <small>kWh</small></strong></div>
-          <div className={`trace-system trace-lighting${lightingFeedback ? " twin-state-feedback" : ""}`} key={`trace-lighting-${lightingFeedback ? feedbackToken : 0}`}><i /><span>Lighting</span><strong>{formatEnergy(result.lightingEnergyKWh)} <small>kWh</small></strong></div>
-          <div className="trace-total"><span>MODELED ENERGY</span><strong>{formatEnergy(result.dailyEnergyKWh)} <small>kWh/day</small></strong></div>
+          <div className={`trace-system trace-hvac${hvacFeedback ? " twin-state-feedback" : ""}${hvacCausalFocus ? " twin-causal-target" : ""}`} key={`trace-hvac-${hvacFeedback ? feedbackToken : 0}`}><i /><span>HVAC</span><strong><AnimatedNumber value={result.hvacEnergyKWh} /> <small>kWh</small></strong></div>
+          <div className={`trace-system trace-devices${devicesFeedback ? " twin-state-feedback" : ""}${devicesCausalFocus ? " twin-causal-target" : ""}`} key={`trace-devices-${devicesFeedback ? feedbackToken : 0}`}><i /><span>Devices</span><strong><AnimatedNumber value={result.deviceEnergyKWh} /> <small>kWh</small></strong></div>
+          <div className={`trace-system trace-lighting${lightingFeedback ? " twin-state-feedback" : ""}${lightingCausalFocus ? " twin-causal-target" : ""}`} key={`trace-lighting-${lightingFeedback ? feedbackToken : 0}`}><i /><span>Lighting</span><strong><AnimatedNumber value={result.lightingEnergyKWh} /> <small>kWh</small></strong></div>
+          <div className="trace-total"><span>MODELED ENERGY</span><strong><AnimatedNumber value={result.dailyEnergyKWh} /> <small>kWh/day</small></strong></div>
         </div>
       </div>
     </section>

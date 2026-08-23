@@ -1,5 +1,6 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
 import { presentImpactDelta } from "@/lib/workspace/impactPresentation";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 interface DecisionSnapshotProps {
   model: Readonly<WorkspaceModel>;
@@ -70,7 +71,7 @@ export function DecisionSnapshot({ model }: DecisionSnapshotProps) {
       <div className="snapshot-delta">
         <span>{dailyLabel}</span>
         <strong>
-          {format(dailyPresentation.magnitude)}{" "}
+          <AnimatedNumber value={dailyPresentation.magnitude} />{" "}
           <small>
             kWh/day{dailyPresentation.valueQualifier ? ` ${dailyPresentation.valueQualifier}` : ""}
           </small>
@@ -79,9 +80,9 @@ export function DecisionSnapshot({ model }: DecisionSnapshotProps) {
       </div>
 
       <div className="snapshot-energy-pair" aria-label="Current and optimized modeled energy">
-        <div><span>Current</span><strong>{format(model.baseline.energyKWh.daily)}</strong><small>kWh/day</small></div>
+        <div><span>Current</span><strong><AnimatedNumber value={model.baseline.energyKWh.daily} /></strong><small>kWh/day</small></div>
         <i aria-hidden="true">→</i>
-        <div><span>EcoTwin plan</span><strong>{format(model.optimized.energyKWh.daily)}</strong><small>kWh/day</small></div>
+        <div><span>EcoTwin plan</span><strong><AnimatedNumber value={model.optimized.energyKWh.daily} /></strong><small>kWh/day</small></div>
       </div>
 
       <div className="snapshot-recommendation">
@@ -90,9 +91,9 @@ export function DecisionSnapshot({ model }: DecisionSnapshotProps) {
       </div>
 
       <dl className="snapshot-annual-impact">
-        <div><dt>{annualLabels[annualEnergy.direction].energy}</dt><dd>{format(annualEnergy.magnitude)} kWh</dd></div>
-        <div><dt>{annualLabels[annualEmissions.direction].emissions}</dt><dd>{format(annualEmissions.magnitude)} kg CO₂</dd></div>
-        <div><dt>{annualLabels[annualCost.direction].cost}</dt><dd>${format(annualCost.magnitude, 2)}</dd></div>
+        <div><dt>{annualLabels[annualEnergy.direction].energy}</dt><dd><AnimatedNumber value={annualEnergy.magnitude} /> kWh</dd></div>
+        <div><dt>{annualLabels[annualEmissions.direction].emissions}</dt><dd><AnimatedNumber value={annualEmissions.magnitude} /> kg CO₂</dd></div>
+        <div><dt>{annualLabels[annualCost.direction].cost}</dt><dd><AnimatedNumber value={annualCost.magnitude} maximumFractionDigits={2} prefix="$" /></dd></div>
       </dl>
     </section>
   );

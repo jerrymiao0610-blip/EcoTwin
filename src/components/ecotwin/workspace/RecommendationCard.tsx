@@ -1,11 +1,13 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
 import { presentImpactDelta } from "@/lib/workspace/impactPresentation";
+import type { TwinSystemFocus } from "../ClassroomTwin";
 
 type Recommendation = WorkspaceModel["recommendations"][number];
 
 interface RecommendationCardProps {
   recommendation: Readonly<Recommendation>;
   sequence: number;
+  onTwinFocusChange?: (system: TwinSystemFocus | null) => void;
 }
 
 const priorityLabels: Readonly<Record<Recommendation["priority"], string>> = {
@@ -23,6 +25,14 @@ const parameterLabels: Readonly<
   devicePowerW: "Device allowance",
 };
 
+const twinTargets: Readonly<
+  Record<NonNullable<Recommendation["parameterChange"]>["parameter"], TwinSystemFocus>
+> = {
+  thermostatTemperatureC: "HVAC",
+  lightingLevelPercent: "Lighting",
+  devicePowerW: "Devices",
+};
+
 const formatNumber = (value: number, maximumFractionDigits = 1) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(value);
 
@@ -30,8 +40,10 @@ const formatNumber = (value: number, maximumFractionDigits = 1) =>
 export function RecommendationCard({
   recommendation,
   sequence,
+  onTwinFocusChange,
 }: RecommendationCardProps) {
   const change = recommendation.parameterChange;
+  const twinTarget = change ? twinTargets[change.parameter] : null;
   const componentEnergy = presentImpactDelta(
     recommendation.evidence.componentDailyEnergyChangeKWh,
   );
@@ -42,13 +54,32 @@ export function RecommendationCard({
       : "Daily component energy change";
 
   return (
-    <article className={`recommendation-card priority-${recommendation.priority}`}>
+    <article
+      className={`recommendation-card priority-${recommendation.priority}`}
+      data-twin-target={twinTarget?.toLowerCase()}
+      tabIndex={twinTarget ? 0 : undefined}
+      onPointerEnter={() => onTwinFocusChange?.(twinTarget)}
+      onPointerLeave={(event) => {
+        if (!event.currentTarget.matches(":focus-within")) onTwinFocusChange?.(null);
+      }}
+      onFocus={() => onTwinFocusChange?.(twinTarget)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) onTwinFocusChange?.(null);
+      }}
+    >
       <div className="recommendation-topline">
         <span className="recommendation-sequence">
           {String(sequence).padStart(2, "0")}
         </span>
-        <span className="recommendation-priority">
-          {priorityLabels[recommendation.priority]}
+        <span className="recommendation-meta">
+          {twinTarget ? (
+            <span className="recommendation-twin-target">
+              <i aria-hidden="true" /> Twin focus · {twinTarget}
+            </span>
+          ) : null}
+          <span className="recommendation-priority">
+            {priorityLabels[recommendation.priority]}
+          </span>
         </span>
       </div>
 
@@ -65,15 +96,14 @@ export function RecommendationCard({
         </div>
       ) : null}
 
+      <div className="recommendation-impact">
+        <small>{componentEnergyLabel}</small>
+        <strong>{formatNumber(componentEnergy.magnitude, 2)} kWh</strong>
+      </div>
+
       <p>{recommendation.explanation}</p>
 
       <div className="recommendation-evidence">
-        <span>
-          <small>{componentEnergyLabel}</small>
-          <strong>
-            {formatNumber(componentEnergy.magnitude, 2)} kWh
-          </strong>
-        </span>
         <span>
           <small>Share of gross change</small>
           <strong>

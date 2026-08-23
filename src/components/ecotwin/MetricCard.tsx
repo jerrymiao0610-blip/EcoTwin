@@ -1,9 +1,13 @@
+import { AnimatedNumber } from "./AnimatedNumber";
+
 type MetricCardProps = {
   label: string;
-  value: string;
+  value: number;
   unit: string;
   detail: string;
   tone: "energy" | "carbon" | "cost" | "score";
+  maximumFractionDigits?: number;
+  prefix?: string;
   classification?: string;
   feedback?: boolean;
 };
@@ -31,7 +35,7 @@ function MetricIcon({ tone }: Pick<MetricCardProps, "tone">) {
   return <svg {...commonProps}><path d="M5 16.5a8 8 0 1 1 14 0" /><path d="m12 13 3.5-3.5" /><path d="M7.5 18h9" /></svg>;
 }
 
-export function MetricCard({ label, value, unit, detail, tone, classification, feedback = false }: MetricCardProps) {
+export function MetricCard({ label, value, unit, detail, tone, maximumFractionDigits = 1, prefix, classification, feedback = false }: MetricCardProps) {
   return (
     <article className={`metric-card metric-card-${tone}${feedback ? " metric-feedback" : ""}`}>
       <div className="metric-card-top">
@@ -42,7 +46,7 @@ export function MetricCard({ label, value, unit, detail, tone, classification, f
         <span aria-hidden="true" className="metric-glyph"><MetricIcon tone={tone} /></span>
       </div>
       <div className="metric-value-row">
-        <strong>{value}</strong><span>{unit}</span>
+        <strong><AnimatedNumber value={value} maximumFractionDigits={maximumFractionDigits} prefix={prefix} /></strong><span>{unit}</span>
       </div>
       <p>{detail}</p>
     </article>

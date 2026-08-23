@@ -1,5 +1,6 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
 import { presentImpactDelta } from "@/lib/workspace/impactPresentation";
+import { AnimatedNumber } from "../AnimatedNumber";
 
 interface ImpactSummaryProps {
   model: Readonly<WorkspaceModel>;
@@ -49,16 +50,15 @@ function ImpactMetric({
   maximumFractionDigits?: number;
 }) {
   const presentation = presentImpactDelta(impact.difference);
-  const formattedMagnitude = formatNumber(
-    presentation.magnitude,
-    maximumFractionDigits,
-  );
-
   return (
     <div className={`impact-summary-metric direction-${presentation.direction}`}>
       <span>{labels[presentation.direction]}</span>
       <strong>
-        {currency ? "$" : ""}{formattedMagnitude}{unit ? ` ${unit}` : ""}
+        <AnimatedNumber
+          value={presentation.magnitude}
+          maximumFractionDigits={maximumFractionDigits}
+          prefix={currency ? "$" : ""}
+        />{unit ? ` ${unit}` : ""}
       </strong>
       <small>
         {impact.percentageChange === null

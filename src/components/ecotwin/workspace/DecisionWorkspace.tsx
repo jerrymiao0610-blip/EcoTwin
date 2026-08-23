@@ -1,4 +1,6 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
+import type { TwinSystemFocus } from "../ClassroomTwin";
+import { AnimatedNumber } from "../AnimatedNumber";
 import { ContextBadge } from "./ContextBadge";
 import { ImpactSummary } from "./ImpactSummary";
 import { PlanComparison } from "./PlanComparison";
@@ -6,6 +8,7 @@ import { RecommendationCard } from "./RecommendationCard";
 
 interface DecisionWorkspaceProps {
   model: Readonly<WorkspaceModel>;
+  onTwinFocusChange?: (system: TwinSystemFocus | null) => void;
 }
 
 const componentLabels: Readonly<
@@ -26,7 +29,7 @@ const formatCapturedAt = (capturedAt: string) =>
   }).format(new Date(capturedAt));
 
 /** Complete Decision Intelligence view backed only by WorkspaceModel. */
-export function DecisionWorkspace({ model }: DecisionWorkspaceProps) {
+export function DecisionWorkspace({ model, onTwinFocusChange }: DecisionWorkspaceProps) {
   const snapshot = model.evidence.snapshotMetadata;
   const classroomName = model.classroom.name ?? "Interactive classroom";
 
@@ -104,7 +107,7 @@ export function DecisionWorkspace({ model }: DecisionWorkspaceProps) {
           </div>
 
           <div className="baseline-primary">
-            <strong>{formatNumber(model.baseline.energyKWh.daily)}</strong>
+            <strong><AnimatedNumber value={model.baseline.energyKWh.daily} /></strong>
             <span>kWh / day</span>
             <small>{model.baseline.hvacMode} HVAC mode</small>
           </div>
@@ -112,15 +115,15 @@ export function DecisionWorkspace({ model }: DecisionWorkspaceProps) {
           <dl className="baseline-periods">
             <div>
               <dt>Monthly</dt>
-              <dd>{formatNumber(model.baseline.energyKWh.monthly)} kWh</dd>
+              <dd><AnimatedNumber value={model.baseline.energyKWh.monthly} /> kWh</dd>
             </div>
             <div>
               <dt>Annual</dt>
-              <dd>{formatNumber(model.baseline.energyKWh.annual)} kWh</dd>
+              <dd><AnimatedNumber value={model.baseline.energyKWh.annual} /> kWh</dd>
             </div>
             <div>
               <dt>Efficiency</dt>
-              <dd>{formatNumber(model.baseline.ecoScore, 0)} / 100</dd>
+              <dd><AnimatedNumber value={model.baseline.ecoScore} maximumFractionDigits={0} /> / 100</dd>
             </div>
           </dl>
 
@@ -134,7 +137,7 @@ export function DecisionWorkspace({ model }: DecisionWorkspaceProps) {
                       component as keyof WorkspaceModel["baseline"]["dailyEnergyByComponent"]
                     ]}
                   </span>
-                  <strong>{formatNumber(energy, 2)} kWh</strong>
+                  <strong><AnimatedNumber value={energy} maximumFractionDigits={2} /> kWh</strong>
                 </div>
               ),
             )}
@@ -156,6 +159,7 @@ export function DecisionWorkspace({ model }: DecisionWorkspaceProps) {
                 key={recommendation.id}
                 recommendation={recommendation}
                 sequence={index + 1}
+                onTwinFocusChange={onTwinFocusChange}
               />
             ))}
           </div>
