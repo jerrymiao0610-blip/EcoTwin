@@ -1,7 +1,12 @@
 import { compareSimulationResults } from "../impact/impact";
 import { optimizeClassroomEnergy } from "../optimizer/optimizer";
 import { simulateClassroomEnergy, type ClassroomConfig } from "../simulation";
+import type { TwinSnapshot } from "../twin/types";
 import { generateDecisionRecommendations } from "./recommendation";
+import {
+  twinSnapshotToClassroomConfig,
+  twinSnapshotToDecisionContext,
+} from "./twinAdapter";
 import type { DecisionPackage, DecisionPipelineOptions } from "./types";
 
 export const DECISION_PIPELINE_VERSION = "1.0.0";
@@ -42,6 +47,26 @@ export function runDecisionPipeline(
       recommendationCount: recommendations.length,
       baselineConfiguration: optimization.baselineConfiguration,
       optimizedConfiguration: optimization.optimizedConfiguration,
+    },
+  };
+}
+
+/**
+ * Runs the decision workflow from an immutable digital-twin snapshot while
+ * retaining its identity, context, and provenance in the result metadata.
+ */
+export function runTwinDecisionPipeline(
+  twin: Readonly<TwinSnapshot>,
+  options: Readonly<DecisionPipelineOptions> = {},
+): DecisionPackage {
+  const configuration = twinSnapshotToClassroomConfig(twin);
+  const decision = runDecisionPipeline(configuration, options);
+
+  return {
+    ...decision,
+    metadata: {
+      ...decision.metadata,
+      twin: twinSnapshotToDecisionContext(twin),
     },
   };
 }

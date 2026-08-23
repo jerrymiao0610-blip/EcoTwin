@@ -8,6 +8,11 @@ import type {
   ParameterChange,
 } from "../optimizer/types";
 import type { ClassroomConfig, SimulationResult } from "../simulation";
+import type {
+  TwinContext,
+  TwinDefinition,
+  TwinSnapshotMetadata,
+} from "../twin/types";
 
 export type RecommendationPriority = "high" | "medium" | "low" | "none";
 
@@ -31,6 +36,13 @@ export interface DecisionRecommendation {
   evidence: RecommendationEvidence;
 }
 
+/** Snapshot identity, context, and provenance carried through a twin decision. */
+export interface TwinDecisionContext {
+  definition: TwinDefinition;
+  context: TwinContext;
+  snapshotMetadata: TwinSnapshotMetadata;
+}
+
 /** Deterministic execution details and configuration provenance. */
 export interface DecisionMetadata {
   pipelineVersion: string;
@@ -40,6 +52,8 @@ export interface DecisionMetadata {
   recommendationCount: number;
   baselineConfiguration: ClassroomConfig;
   optimizedConfiguration: ClassroomConfig;
+  /** Present only when the decision originated from a digital-twin snapshot. */
+  twin?: TwinDecisionContext;
 }
 
 /** Complete output of the EcoTwin decision workflow. */

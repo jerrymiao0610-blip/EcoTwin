@@ -7,7 +7,53 @@ import {
   simulateClassroomEnergy,
   type ClassroomConfig,
 } from "../simulation";
-import { DECISION_PIPELINE_VERSION, runDecisionPipeline } from "./pipeline";
+import { createTwinSnapshot } from "../twin/twin";
+import type { TwinSnapshot } from "../twin/types";
+import {
+  DECISION_PIPELINE_VERSION,
+  runDecisionPipeline,
+  runTwinDecisionPipeline,
+} from "./pipeline";
+import { twinSnapshotToClassroomConfig } from "./twinAdapter";
+
+function createEquivalentTwin(): TwinSnapshot {
+  return createTwinSnapshot({
+    definition: {
+      id: "classroom-101",
+      name: "Science Classroom 101",
+      physicalProperties: {
+        roomAreaM2: DEFAULT_CLASSROOM_CONFIG.roomAreaM2,
+        lightingPowerDensityWPerM2:
+          DEFAULT_CLASSROOM_CONFIG.lightingPowerDensityWPerM2,
+      },
+    },
+    state: {
+      thermostatTemperatureC:
+        DEFAULT_CLASSROOM_CONFIG.thermostatTemperatureC,
+      lightingLevelPercent: DEFAULT_CLASSROOM_CONFIG.lightingLevelPercent,
+      devicePowerW: DEFAULT_CLASSROOM_CONFIG.devicePowerW,
+      hvacEnabled: DEFAULT_CLASSROOM_CONFIG.hvacEnabled,
+      lightsEnabled: DEFAULT_CLASSROOM_CONFIG.lightsEnabled,
+      devicesEnabled: DEFAULT_CLASSROOM_CONFIG.devicesEnabled,
+    },
+    context: {
+      occupants: DEFAULT_CLASSROOM_CONFIG.occupants,
+      outsideTemperatureC: DEFAULT_CLASSROOM_CONFIG.outsideTemperatureC,
+      operatingHoursPerDay: DEFAULT_CLASSROOM_CONFIG.operatingHoursPerDay,
+      operatingDaysPerMonth: DEFAULT_CLASSROOM_CONFIG.operatingDaysPerMonth,
+      operatingDaysPerYear: DEFAULT_CLASSROOM_CONFIG.operatingDaysPerYear,
+      electricityPricePerKWh:
+        DEFAULT_CLASSROOM_CONFIG.electricityPricePerKWh,
+      carbonIntensityKgPerKWh:
+        DEFAULT_CLASSROOM_CONFIG.carbonIntensityKgPerKWh,
+    },
+    capturedAt: "2026-08-23T10:30:00.000Z",
+    provenance: {
+      source: "open-meteo",
+      sourceVersion: "phase-7a",
+    },
+  });
+}
 
 describe("runDecisionPipeline", () => {
   it("completes the simulation, optimization, impact, and recommendation flow", () => {
@@ -160,5 +206,57 @@ describe("runDecisionPipeline", () => {
     );
     expect(decision.impactReport.direction).toBe("neutral");
     expect(decision.recommendations[0].id).toBe("maintain-current-controls");
+  });
+});
+
+describe("runTwinDecisionPipeline", () => {
+  it("returns exactly the same package for repeated runs of one snapshot", () => {
+    const twin = createEquivalentTwin();
+
+    expect(runTwinDecisionPipeline(twin)).toEqual(
+      runTwinDecisionPipeline(twin),
+    );
+  });
+
+  it("matches the config pipeline for equivalent simulation inputs", () => {
+    const twin = createEquivalentTwin();
+    const configuration = twinSnapshotToClassroomConfig(twin);
+    const configDecision = runDecisionPipeline(DEFAULT_CLASSROOM_CONFIG);
+    const twinDecision = runTwinDecisionPipeline(twin);
+    const { twin: twinContext, ...legacyMetadata } = twinDecision.metadata;
+
+    expect(configuration).toEqual(DEFAULT_CLASSROOM_CONFIG);
+    expect(twinContext).toBeDefined();
+    expect({ ...twinDecision, metadata: legacyMetadata }).toEqual(
+      configDecision,
+    );
+  });
+
+  it("does not mutate or retain mutable references to the snapshot", () => {
+    const twin = createEquivalentTwin();
+    const original = structuredClone(twin);
+    const decision = runTwinDecisionPipeline(twin);
+
+    expect(twin).toEqual(original);
+    expect(decision.metadata.twin?.definition).not.toBe(twin.definition);
+    expect(decision.metadata.twin?.context).not.toBe(twin.context);
+    expect(decision.metadata.twin?.snapshotMetadata).not.toBe(twin.metadata);
+    expect(decision.metadata.twin?.snapshotMetadata.provenance).not.toBe(
+      twin.metadata.provenance,
+    );
+  });
+
+  it("preserves weather-derived context and snapshot provenance", () => {
+    const twin = createEquivalentTwin();
+    const decision = runTwinDecisionPipeline(twin);
+
+    expect(decision.metadata.baselineConfiguration.outsideTemperatureC).toBe(
+      twin.context.outsideTemperatureC,
+    );
+    expect(decision.metadata.twin).toEqual({
+      definition: twin.definition,
+      context: twin.context,
+      snapshotMetadata: twin.metadata,
+    });
   });
 });
