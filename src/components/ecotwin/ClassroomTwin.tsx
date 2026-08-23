@@ -52,9 +52,9 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
   return (
     <section className="twin-panel" aria-labelledby="twin-title">
       <div className="panel-heading twin-heading">
-        <div><span className="eyebrow">02 · Observe live</span><h2 id="twin-title">Classroom digital twin</h2></div>
+        <div><span className="eyebrow">02 · Digital twin</span><h2 id="twin-title">Classroom digital twin</h2></div>
         <div className="twin-live-output" aria-label={`${formatEnergy(result.dailyEnergyKWh)} kilowatt-hours modeled energy per day`}>
-          <span>Live modeled load</span><strong>{formatEnergy(result.dailyEnergyKWh)} <small>kWh/day</small></strong>
+          <span>Current modeled load</span><strong>{formatEnergy(result.dailyEnergyKWh)} <small>kWh/day</small></strong>
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
         </div>
 
         <div className={`room-label${roomFeedback ? " twin-state-feedback" : ""}`} key={`room-${roomFeedback ? feedbackToken : 0}`}>
-          <strong>ROOM 204</strong><span>{config.roomAreaM2} m²</span><span className="room-occupancy">{config.occupants} people</span>
+          <strong>INTERACTIVE CLASSROOM</strong><span>{config.roomAreaM2} m²</span><span className="room-occupancy">{config.occupants} people</span>
         </div>
 
         <div className="thermal-guide" aria-hidden="true"><span>OUTSIDE</span><i /><b>ROOM TARGET</b></div>
@@ -109,7 +109,7 @@ export function ClassroomTwin({ config, result, highlightedItems = [], feedbackK
           <div className="device-level" aria-hidden="true">{[1, 2, 3].map((bar) => <i className={bar <= deviceBars ? "active" : ""} key={bar} />)}</div>
         </div>
 
-        <div className="energy-trace" aria-label="Live daily modeled energy by classroom system">
+        <div className="energy-trace" aria-label="Daily modeled energy by classroom system">
           <span className="trace-kicker">Daily load</span>
           <div className={`trace-system trace-hvac${hvacFeedback ? " twin-state-feedback" : ""}`} key={`trace-hvac-${hvacFeedback ? feedbackToken : 0}`}><i /><span>HVAC</span><strong>{formatEnergy(result.hvacEnergyKWh)} <small>kWh</small></strong></div>
           <div className={`trace-system trace-devices${devicesFeedback ? " twin-state-feedback" : ""}`} key={`trace-devices-${devicesFeedback ? feedbackToken : 0}`}><i /><span>Devices</span><strong>{formatEnergy(result.deviceEnergyKWh)} <small>kWh</small></strong></div>

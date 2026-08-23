@@ -1,4 +1,5 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
+import { presentImpactDelta } from "@/lib/workspace/impactPresentation";
 
 interface ImpactSummaryProps {
   model: Readonly<WorkspaceModel>;
@@ -34,33 +35,37 @@ const componentLabels: Readonly<
 const formatNumber = (value: number, maximumFractionDigits = 1) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(value);
 
-const formatSigned = (value: number, maximumFractionDigits = 1) => {
-  if (value === 0) return formatNumber(0, maximumFractionDigits);
-  const sign = value > 0 ? "+" : "−";
-  return `${sign}${formatNumber(Math.abs(value), maximumFractionDigits)}`;
-};
-
 function ImpactMetric({
-  label,
+  labels,
   impact,
   unit,
+  currency = false,
   maximumFractionDigits = 1,
 }: {
-  label: string;
+  labels: Readonly<Record<WorkspaceModel["impact"]["direction"], string>>;
   impact: Readonly<AnnualImpact>;
   unit: string;
+  currency?: boolean;
   maximumFractionDigits?: number;
 }) {
+  const presentation = presentImpactDelta(impact.difference);
+  const formattedMagnitude = formatNumber(
+    presentation.magnitude,
+    maximumFractionDigits,
+  );
+
   return (
-    <div className="impact-summary-metric">
-      <span>{label}</span>
+    <div className={`impact-summary-metric direction-${presentation.direction}`}>
+      <span>{labels[presentation.direction]}</span>
       <strong>
-        {formatSigned(impact.difference, maximumFractionDigits)} {unit}
+        {currency ? "$" : ""}{formattedMagnitude}{unit ? ` ${unit}` : ""}
       </strong>
       <small>
         {impact.percentageChange === null
           ? "Change from a zero baseline"
-          : `${formatSigned(impact.percentageChange, 1)}% vs baseline`}
+          : presentation.direction === "neutral"
+            ? "No change vs baseline"
+            : `${formatNumber(Math.abs(impact.percentageChange), 1)}% ${presentation.comparisonQualifier} vs baseline`}
       </small>
     </div>
   );
@@ -100,19 +105,32 @@ export function ImpactSummary({ model }: ImpactSummaryProps) {
 
       <div className="impact-summary-metrics" aria-label="Annual modeled impact">
         <ImpactMetric
-          label="Annual energy"
+          labels={{
+            improvement: "Energy saved / year",
+            degradation: "Additional energy / year",
+            neutral: "Annual energy change",
+          }}
           impact={model.impact.energyKWh.annual}
           unit="kWh"
         />
         <ImpactMetric
-          label="Annual emissions"
+          labels={{
+            improvement: "Emissions avoided / year",
+            degradation: "Additional emissions / year",
+            neutral: "Annual emissions change",
+          }}
           impact={model.impact.co2Kg.annual}
           unit="kg CO₂"
         />
         <ImpactMetric
-          label="Annual cost"
+          labels={{
+            improvement: "Cost saved / year",
+            degradation: "Additional cost / year",
+            neutral: "Annual cost change",
+          }}
           impact={model.impact.cost.annual}
-          unit="USD"
+          unit=""
+          currency
           maximumFractionDigits={2}
         />
       </div>

@@ -1,6 +1,7 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
 import { ContextBadge } from "./ContextBadge";
 import { ImpactSummary } from "./ImpactSummary";
+import { PlanComparison } from "./PlanComparison";
 import { RecommendationCard } from "./RecommendationCard";
 
 interface DecisionWorkspaceProps {
@@ -52,6 +53,8 @@ export function DecisionWorkspace({ model }: DecisionWorkspaceProps) {
           </small>
         </div>
       </header>
+
+      <PlanComparison model={model} />
 
       <section className="workspace-context" aria-labelledby="workspace-context-title">
         <div className="workspace-section-heading">

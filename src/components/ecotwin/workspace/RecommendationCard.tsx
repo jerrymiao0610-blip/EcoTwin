@@ -1,4 +1,5 @@
 import type { WorkspaceModel } from "@/lib/workspace/types";
+import { presentImpactDelta } from "@/lib/workspace/impactPresentation";
 
 type Recommendation = WorkspaceModel["recommendations"][number];
 
@@ -25,18 +26,20 @@ const parameterLabels: Readonly<
 const formatNumber = (value: number, maximumFractionDigits = 1) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(value);
 
-const formatSigned = (value: number, maximumFractionDigits = 1) => {
-  if (value === 0) return formatNumber(0, maximumFractionDigits);
-  const sign = value > 0 ? "+" : "−";
-  return `${sign}${formatNumber(Math.abs(value), maximumFractionDigits)}`;
-};
-
 /** Presents one recommendation exactly as supplied by WorkspaceModel. */
 export function RecommendationCard({
   recommendation,
   sequence,
 }: RecommendationCardProps) {
   const change = recommendation.parameterChange;
+  const componentEnergy = presentImpactDelta(
+    recommendation.evidence.componentDailyEnergyChangeKWh,
+  );
+  const componentEnergyLabel = componentEnergy.direction === "improvement"
+    ? "Daily component energy saved"
+    : componentEnergy.direction === "degradation"
+      ? "Additional daily component energy"
+      : "Daily component energy change";
 
   return (
     <article className={`recommendation-card priority-${recommendation.priority}`}>
@@ -66,13 +69,9 @@ export function RecommendationCard({
 
       <div className="recommendation-evidence">
         <span>
-          <small>Daily component change</small>
+          <small>{componentEnergyLabel}</small>
           <strong>
-            {formatSigned(
-              recommendation.evidence.componentDailyEnergyChangeKWh,
-              2,
-            )}{" "}
-            kWh
+            {formatNumber(componentEnergy.magnitude, 2)} kWh
           </strong>
         </span>
         <span>
