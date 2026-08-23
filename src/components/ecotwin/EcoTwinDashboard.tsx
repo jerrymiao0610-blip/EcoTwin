@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { DEFAULT_CLASSROOM_CONFIG, simulateClassroomEnergy, type ClassroomConfig } from "@/lib/simulation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { runDecisionPipeline } from "@/lib/decision/pipeline";
+import { DEFAULT_CLASSROOM_CONFIG, type ClassroomConfig } from "@/lib/simulation";
+import { buildWorkspace } from "@/lib/workspace/buildWorkspace";
 import { ClassroomControls } from "./ClassroomControls";
 import { ClassroomTwin } from "./ClassroomTwin";
 import { EnergyBreakdown, type BreakdownCategory } from "./EnergyBreakdown";
 import { ExplanationPanel } from "./ExplanationPanel";
 import { MetricCard } from "./MetricCard";
 import { PeriodSelector, type Period } from "./PeriodSelector";
+import { DecisionWorkspace } from "./workspace/DecisionWorkspace";
 
 const values = { daily: { energy: "dailyEnergyKWh", carbon: "dailyCO2Kg", cost: "dailyCost", label: "per day" }, monthly: { energy: "monthlyEnergyKWh", carbon: "monthlyCO2Kg", cost: "monthlyCost", label: "per month" }, annual: { energy: "annualEnergyKWh", carbon: "annualCO2Kg", cost: "annualCost", label: "per year" } } as const;
 const format = (number: number, decimals = 1) => new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals }).format(number);
@@ -26,7 +29,14 @@ export function EcoTwinDashboard() {
   const [period, setPeriod] = useState<Period>("daily");
   const [feedback, setFeedback] = useState<{ key: FeedbackKey; token: number }>({ key: null, token: 0 });
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const result = simulateClassroomEnergy(config);
+  const { result, workspace } = useMemo(() => {
+    const decision = runDecisionPipeline(config);
+
+    return {
+      result: decision.baselineSimulation,
+      workspace: buildWorkspace(decision),
+    };
+  }, [config]);
   const current = values[period];
   const triggerFeedback = (key: Exclude<FeedbackKey, null>) => {
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
@@ -100,6 +110,7 @@ export function EcoTwinDashboard() {
         </div>
       </div>
       <ExplanationPanel result={result} />
+      <DecisionWorkspace model={workspace} />
       <footer>EcoTwin results are modelled estimates for classroom decision-making.</footer>
     </main>
   );
