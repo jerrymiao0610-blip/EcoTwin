@@ -17,5 +17,11 @@ export {
   validateExplanationResult,
   type ExplanationProvider,
 } from "./provider";
+export {
+  explanationRequestKey,
+  isExplanationResultStale,
+  parseExplanationApiRequest,
+  ExplanationRequestError,
+  type ExplanationApiRequest,
+} from "./apiRequest";
 export type * from "./types";
-

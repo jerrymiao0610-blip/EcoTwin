@@ -11,6 +11,7 @@ import { ClassroomTwin } from "./ClassroomTwin";
 import { DecisionSnapshot } from "./DecisionSnapshot";
 import { EnergyBreakdown, type BreakdownCategory } from "./EnergyBreakdown";
 import { ExplanationPanel } from "./ExplanationPanel";
+import { GroundedExplanation } from "./explanation/GroundedExplanation";
 import { MetricCard } from "./MetricCard";
 import { PeriodSelector, type Period } from "./PeriodSelector";
 import { ScenarioDecisionFlow } from "./scenarios/ScenarioDecisionFlow";
@@ -132,6 +133,20 @@ export function EcoTwinDashboard() {
 
       {activeScenarioResponse ? <ScenarioResponseSnapshot model={activeScenarioResponse} /> : null}
       {activeScenarioResponse ? <ScenarioResponseEvidence model={activeScenarioResponse} onTwinFocusChange={setCausalFocus} /> : null}
+      {activeScenario && activeScenarioResponse ? (
+        <GroundedExplanation
+          mode="scenario"
+          configuration={config}
+          scenario={activeScenario}
+          response={activeScenarioResponse}
+        />
+      ) : (
+        <GroundedExplanation
+          mode="current"
+          configuration={config}
+          model={workspace}
+        />
+      )}
 
       <section className="simulation-instruments" aria-labelledby="simulation-instruments-title">
         <header className="instrument-header">

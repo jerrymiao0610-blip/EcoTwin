@@ -45,6 +45,14 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Optional grounded Gemini explanations
+
+EcoTwin works without an AI provider and shows a deterministic evidence
+summary. To enable server-side Gemini prose, copy `.env.example` to
+`.env.local` and set `GEMINI_API_KEY`. `GEMINI_MODEL` is optional and defaults
+to `gemini-2.5-flash`. Never prefix the key with `NEXT_PUBLIC_`; the browser
+calls EcoTwin's narrow explanation route and never receives the credential.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
