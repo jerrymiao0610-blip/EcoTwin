@@ -7,6 +7,7 @@ type Recommendation = WorkspaceModel["recommendations"][number];
 interface RecommendationCardProps {
   recommendation: Readonly<Recommendation>;
   sequence: number;
+  focusable?: boolean;
   onTwinFocusChange?: (system: TwinSystemFocus | null) => void;
 }
 
@@ -40,6 +41,7 @@ const formatNumber = (value: number, maximumFractionDigits = 1) =>
 export function RecommendationCard({
   recommendation,
   sequence,
+  focusable = false,
   onTwinFocusChange,
 }: RecommendationCardProps) {
   const change = recommendation.parameterChange;
@@ -57,7 +59,7 @@ export function RecommendationCard({
     <article
       className={`recommendation-card priority-${recommendation.priority}`}
       data-twin-target={twinTarget?.toLowerCase()}
-      tabIndex={twinTarget ? 0 : undefined}
+      tabIndex={focusable || twinTarget ? 0 : undefined}
       onPointerEnter={() => onTwinFocusChange?.(twinTarget)}
       onPointerLeave={(event) => {
         if (!event.currentTarget.matches(":focus-within")) onTwinFocusChange?.(null);

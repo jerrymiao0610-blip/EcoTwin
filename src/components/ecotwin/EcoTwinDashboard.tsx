@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { runDecisionPipeline } from "@/lib/decision/pipeline";
 import { DEFAULT_CLASSROOM_CONFIG, type ClassroomConfig } from "@/lib/simulation";
 import { buildScenarioWorkspaceModels } from "@/lib/workspace/buildScenarioWorkspace";
+import { buildScenarioResponse } from "@/lib/workspace/buildScenarioResponse";
 import { buildWorkspace } from "@/lib/workspace/buildWorkspace";
 import { ClassroomControls } from "./ClassroomControls";
 import { ClassroomTwin } from "./ClassroomTwin";
@@ -12,9 +13,10 @@ import { EnergyBreakdown, type BreakdownCategory } from "./EnergyBreakdown";
 import { ExplanationPanel } from "./ExplanationPanel";
 import { MetricCard } from "./MetricCard";
 import { PeriodSelector, type Period } from "./PeriodSelector";
-import { ScenarioEvidence } from "./scenarios/ScenarioEvidence";
+import { ScenarioDecisionFlow } from "./scenarios/ScenarioDecisionFlow";
+import { ScenarioResponseEvidence } from "./scenarios/ScenarioResponseEvidence";
+import { ScenarioResponseSnapshot } from "./scenarios/ScenarioResponseSnapshot";
 import { ScenarioSelector, type ScenarioSelectionId } from "./scenarios/ScenarioSelector";
-import { ScenarioSnapshot } from "./scenarios/ScenarioSnapshot";
 import { TwinJourneyRail } from "./TwinJourneyRail";
 import { DecisionWorkspace } from "./workspace/DecisionWorkspace";
 
@@ -48,6 +50,10 @@ export function EcoTwinDashboard() {
   const activeScenario = selectedScenarioId === "current"
     ? null
     : scenarioModels.find((model) => model.id === selectedScenarioId) ?? null;
+  const activeScenarioResponse = useMemo(
+    () => activeScenario ? buildScenarioResponse(activeScenario) : null,
+    [activeScenario],
+  );
   const activeSummary = activeScenario?.scenario ?? workspace.baseline;
   const activeConfig = activeSummary.configuration;
   const activeTwinResult = {
@@ -112,15 +118,20 @@ export function EcoTwinDashboard() {
 
       <TwinJourneyRail />
 
-      <section className="mission-stage" aria-label="Classroom digital twin mission view">
+      <section className={`mission-stage ${activeScenario ? "scenario-mission-stage" : ""}`} aria-label="Classroom digital twin mission view">
         <ScenarioSelector baseline={config} models={scenarioModels} selectedId={selectedScenarioId} onChange={selectScenario} />
         <div className="twin-system">
-          <ClassroomTwin config={activeConfig} result={activeTwinResult} highlightedItems={highlightedItems} causalFocus={activeScenario ? null : causalFocus} feedbackKey={feedback.key} feedbackToken={feedback.token} scenarioTitle={activeScenario?.title ?? null} />
+          <ClassroomTwin config={activeConfig} result={activeTwinResult} highlightedItems={highlightedItems} causalFocus={causalFocus} feedbackKey={feedback.key} feedbackToken={feedback.token} scenarioTitle={activeScenario?.title ?? null} />
         </div>
-        {activeScenario ? <ScenarioSnapshot model={activeScenario} /> : <DecisionSnapshot model={workspace} />}
+        {activeScenario && activeScenarioResponse ? (
+          <ScenarioDecisionFlow scenario={activeScenario} response={activeScenarioResponse} />
+        ) : (
+          <DecisionSnapshot model={workspace} />
+        )}
       </section>
 
-      {activeScenario ? <ScenarioEvidence model={activeScenario} /> : null}
+      {activeScenarioResponse ? <ScenarioResponseSnapshot model={activeScenarioResponse} /> : null}
+      {activeScenarioResponse ? <ScenarioResponseEvidence model={activeScenarioResponse} onTwinFocusChange={setCausalFocus} /> : null}
 
       <section className="simulation-instruments" aria-labelledby="simulation-instruments-title">
         <header className="instrument-header">
