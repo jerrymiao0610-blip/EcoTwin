@@ -1,6 +1,6 @@
 import type { ClassroomConfig } from "@/lib/simulation";
 
-type Props = { config: ClassroomConfig; onChange: <K extends keyof ClassroomConfig>(key: K, value: ClassroomConfig[K]) => void; onReset: () => void };
+type Props = { config: ClassroomConfig; onChange: <K extends keyof ClassroomConfig>(key: K, value: ClassroomConfig[K]) => void; onReset: () => void; contextNote?: string };
 
 function RangeControl({ label, value, min, max, step = 1, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (value: number) => void }) {
   const valueText = `${value}${unit ? ` ${unit}` : ""}`;
@@ -10,9 +10,9 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   return <label className="toggle-row"><span>{label}</span><input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} /><span className="toggle" aria-hidden="true" /></label>;
 }
 
-export function ClassroomControls({ config, onChange, onReset }: Props) {
+export function ClassroomControls({ config, onChange, onReset, contextNote }: Props) {
   return <section className="controls-panel" aria-labelledby="configuration-title">
-    <div className="panel-heading"><div><span className="eyebrow">Detailed inputs</span><h2 id="configuration-title">Classroom controls</h2></div><button type="button" className="reset-button" onClick={onReset}><span aria-hidden="true">↺</span> Reset defaults</button></div>
+    <div className="panel-heading"><div><span className="eyebrow">Detailed inputs</span><h2 id="configuration-title">Classroom controls</h2>{contextNote ? <p className="control-context-note">{contextNote}</p> : null}</div><button type="button" className="reset-button" onClick={onReset}><span aria-hidden="true">↺</span> Reset defaults</button></div>
     <div className="control-groups">
       <fieldset><legend>Classroom</legend><RangeControl label="Room area" value={config.roomAreaM2} min={10} max={250} unit="m²" onChange={(v) => onChange("roomAreaM2", v)} /><RangeControl label="Occupants" value={config.occupants} min={0} max={100} unit="" onChange={(v) => onChange("occupants", v)} /><RangeControl label="Operating hours / day" value={config.operatingHoursPerDay} min={0} max={16} unit="h" onChange={(v) => onChange("operatingHoursPerDay", v)} /><RangeControl label="Operating days / month" value={config.operatingDaysPerMonth} min={0} max={31} unit="days" onChange={(v) => onChange("operatingDaysPerMonth", v)} /><RangeControl label="Operating days / year" value={config.operatingDaysPerYear} min={0} max={366} unit="days" onChange={(v) => onChange("operatingDaysPerYear", v)} /></fieldset>
       <fieldset><legend>Climate & HVAC</legend><RangeControl label="Outdoor temperature" value={config.outsideTemperatureC} min={-10} max={45} unit="°C" onChange={(v) => onChange("outsideTemperatureC", v)} /><RangeControl label="Thermostat target" value={config.thermostatTemperatureC} min={16} max={30} unit="°C" onChange={(v) => onChange("thermostatTemperatureC", v)} /><Toggle label="HVAC enabled" checked={config.hvacEnabled} onChange={(v) => onChange("hvacEnabled", v)} /></fieldset>
