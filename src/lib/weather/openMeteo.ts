@@ -9,6 +9,7 @@ export const OPEN_METEO_ENDPOINT = "https://api.open-meteo.com/v1/forecast";
 export interface OpenMeteoWeatherProviderOptions {
   fetch?: typeof globalThis.fetch;
   endpoint?: string;
+  timeoutMs?: number;
 }
 
 interface OpenMeteoResponse {
@@ -30,10 +31,12 @@ export class WeatherProviderError extends Error {
 export class OpenMeteoWeatherProvider implements WeatherProvider {
   private readonly fetcher: typeof globalThis.fetch;
   private readonly endpoint: string;
+  private readonly timeoutMs: number;
 
   constructor(options: Readonly<OpenMeteoWeatherProviderOptions> = {}) {
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.endpoint = options.endpoint ?? OPEN_METEO_ENDPOINT;
+    this.timeoutMs = options.timeoutMs ?? 5_000;
   }
 
   async getCurrentWeather(
@@ -48,9 +51,17 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
     url.searchParams.set("temperature_unit", "celsius");
     url.searchParams.set("timezone", "UTC");
 
-    const response = await this.fetcher(url, {
-      headers: { Accept: "application/json" },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    let response: Response;
+    try {
+      response = await this.fetcher(url, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
       throw new WeatherProviderError(

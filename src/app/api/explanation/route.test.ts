@@ -35,11 +35,15 @@ describe.sequential("POST /api/explanation", () => {
     expect(result.summary).toBeTruthy();
   });
 
-  it("returns a deterministic Heatwave response with the correct basis", async () => {
+  it.each([
+    "heatwave-tomorrow",
+    "empty-classroom",
+    "eco-mode",
+  ] as const)("returns a deterministic %s response with the correct basis", async (scenarioId) => {
     const response = await POST(jsonRequest({
       mode: "scenario-response",
       configuration: DEFAULT_CLASSROOM_CONFIG,
-      scenarioId: "heatwave-tomorrow",
+      scenarioId,
     }));
     const result = await response.json();
 
@@ -51,7 +55,8 @@ describe.sequential("POST /api/explanation", () => {
   });
 
   it("converts Gemini network failure into a calm deterministic fallback", async () => {
-    process.env.GEMINI_API_KEY = "development-test-key";
+    const testKey = "development-test-key";
+    process.env.GEMINI_API_KEY = testKey;
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("Network unavailable");
     }));
@@ -67,6 +72,7 @@ describe.sequential("POST /api/explanation", () => {
       kind: "deterministic",
       fallbackReason: "provider-error",
     });
+    expect(JSON.stringify(result)).not.toContain(testKey);
   });
 
   it("rejects free-form and malformed requests without invoking a provider", async () => {

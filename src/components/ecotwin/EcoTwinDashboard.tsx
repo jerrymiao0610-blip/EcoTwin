@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { runDecisionPipeline } from "@/lib/decision/pipeline";
+import {
+  createClientManualContext,
+  parseWeatherContextApiResponse,
+} from "@/lib/context/api";
+import { DEFAULT_WEATHER_LOCATION } from "@/lib/context/defaults";
+import type { ContextSnapshot } from "@/lib/context/types";
 import { DEFAULT_CLASSROOM_CONFIG, type ClassroomConfig } from "@/lib/simulation";
+import { normalizeClassroomConfigEdit } from "@/lib/validation/classroomConfig";
 import { buildScenarioWorkspaceModels } from "@/lib/workspace/buildScenarioWorkspace";
 import { buildScenarioResponse } from "@/lib/workspace/buildScenarioResponse";
 import { buildWorkspace } from "@/lib/workspace/buildWorkspace";
@@ -38,7 +45,10 @@ export function EcoTwinDashboard() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<ScenarioSelectionId>("current");
   const [feedback, setFeedback] = useState<{ key: FeedbackKey; token: number }>({ key: null, token: 0 });
   const [causalFocus, setCausalFocus] = useState<BreakdownCategory | null>(null);
+  const [weatherContext, setWeatherContext] = useState<ContextSnapshot | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const weatherController = useRef<AbortController | null>(null);
   const { result, workspace } = useMemo(() => {
     const decision = runDecisionPipeline(config);
 
@@ -70,8 +80,14 @@ export function EcoTwinDashboard() {
     feedbackTimer.current = setTimeout(() => setFeedback((previous) => ({ ...previous, key: null })), 560);
   };
   const update = <K extends keyof ClassroomConfig>(key: K, value: ClassroomConfig[K]) => {
+    if (key === "outsideTemperatureC") {
+      weatherController.current?.abort();
+      weatherController.current = null;
+      setWeatherLoading(false);
+      setWeatherContext(null);
+    }
     setCausalFocus(null);
-    setConfig((previous) => ({ ...previous, [key]: value }));
+    setConfig((previous) => normalizeClassroomConfigEdit(previous, key, value));
     triggerFeedback(key);
   };
   const updatePeriod = (nextPeriod: Period) => {
@@ -84,13 +100,60 @@ export function EcoTwinDashboard() {
     triggerFeedback("scenario");
   };
   const reset = () => {
+    weatherController.current?.abort();
+    weatherController.current = null;
     setCausalFocus(null);
     setConfig(DEFAULT_CLASSROOM_CONFIG);
+    setWeatherContext(null);
+    setWeatherLoading(false);
     triggerFeedback("reset");
+  };
+
+  const refreshWeather = async () => {
+    const controller = new AbortController();
+    const fallbackTemperature = config.outsideTemperatureC;
+    weatherController.current?.abort();
+    weatherController.current = controller;
+    setWeatherLoading(true);
+
+    try {
+      const response = await fetch("/api/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualFallbackTemperature: fallbackTemperature }),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Weather request failed.");
+      const context = parseWeatherContextApiResponse(await response.json());
+      setConfig((previous) =>
+        normalizeClassroomConfigEdit(
+          previous,
+          "outsideTemperatureC",
+          context.temperature,
+        ),
+      );
+      setWeatherContext(context);
+      triggerFeedback("outsideTemperatureC");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setWeatherContext(
+        createClientManualContext(
+          DEFAULT_WEATHER_LOCATION,
+          fallbackTemperature,
+        ),
+      );
+    } finally {
+      if (weatherController.current === controller) {
+        weatherController.current = null;
+        setWeatherLoading(false);
+      }
+    }
   };
 
   useEffect(() => () => {
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    weatherController.current?.abort();
   }, []);
 
   const periodSpecificKey = period === "monthly" ? "operatingDaysPerMonth" : period === "annual" ? "operatingDaysPerYear" : null;
@@ -167,7 +230,7 @@ export function EcoTwinDashboard() {
         <EnergyBreakdown result={activeTwinResult} highlightedItems={highlightedItems} feedbackToken={feedback.token} />
       </section>
 
-      <ClassroomControls config={config} onChange={update} onReset={reset} contextNote={activeScenario ? `Editing the unchanged Current baseline; ${activeScenario.title} updates from these inputs.` : undefined} />
+      <ClassroomControls config={config} onChange={update} onReset={reset} contextNote={activeScenario ? `Editing the unchanged Current baseline; ${activeScenario.title} updates from these inputs.` : undefined} weatherContext={weatherContext} weatherLoading={weatherLoading} weatherLocation={DEFAULT_WEATHER_LOCATION} onWeatherRefresh={refreshWeather} />
       {activeScenario ? null : <ExplanationPanel result={result} />}
       {activeScenario ? null : <DecisionWorkspace model={workspace} onTwinFocusChange={setCausalFocus} />}
       <footer>EcoTwin results are modeled estimates for classroom decision-making.</footer>

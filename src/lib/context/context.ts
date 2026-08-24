@@ -1,4 +1,5 @@
 import type { WeatherProvider, WeatherReading } from "../weather/types";
+import { CLASSROOM_CONFIG_INPUT_RULES } from "../validation/classroomConfig";
 import type {
   ContextSnapshot,
   ContextSnapshotOptions,
@@ -55,7 +56,13 @@ function assertWeatherReading(weather: Readonly<WeatherReading>): void {
 }
 
 function assertFiniteTemperature(value: number, label: string): void {
+  const rule = CLASSROOM_CONFIG_INPUT_RULES.outsideTemperatureC;
   if (!Number.isFinite(value)) {
     throw new TypeError(`${label} must be a finite number.`);
+  }
+  if (value < rule.minimum || value > rule.maximum) {
+    throw new TypeError(
+      `${label} must be from ${rule.minimum} to ${rule.maximum}.`,
+    );
   }
 }

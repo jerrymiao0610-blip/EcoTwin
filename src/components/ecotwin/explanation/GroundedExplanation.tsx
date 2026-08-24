@@ -64,7 +64,7 @@ export function GroundedExplanation(props: GroundedExplanationProps) {
     () => () => {
       controllerRef.current?.abort();
     },
-    [],
+    [requestKey],
   );
 
   const requestExplanation = async () => {

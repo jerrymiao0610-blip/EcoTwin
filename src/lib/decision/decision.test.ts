@@ -186,6 +186,17 @@ describe("runDecisionPipeline", () => {
     expect(decision.metadata.baselineConfiguration).toEqual(snapshot);
   });
 
+  it("rejects non-finite and invalid configuration before orchestration", () => {
+    expect(() => runDecisionPipeline({
+      ...DEFAULT_CLASSROOM_CONFIG,
+      roomAreaM2: 0,
+    })).toThrow("finite number");
+    expect(() => runDecisionPipeline({
+      ...DEFAULT_CLASSROOM_CONFIG,
+      devicePowerW: Number.POSITIVE_INFINITY,
+    })).toThrow("finite number");
+  });
+
   it("passes custom optimizer constraints through the orchestration layer", () => {
     const lockedConstraints: OptimizerConstraints = {
       thermostatTemperatureC: { minimum: 24, maximum: 24, step: 1 },
@@ -229,6 +240,40 @@ describe("runTwinDecisionPipeline", () => {
     expect(twinContext).toBeDefined();
     expect({ ...twinDecision, metadata: legacyMetadata }).toEqual(
       configDecision,
+    );
+  });
+
+  it("accepts the full established Twin domain without narrowing it", () => {
+    const baseline = createEquivalentTwin();
+    const twin = createTwinSnapshot({
+      definition: {
+        ...baseline.definition,
+        physicalProperties: {
+          roomAreaM2: 5,
+          lightingPowerDensityWPerM2: 26,
+        },
+      },
+      state: {
+        ...baseline.state,
+        thermostatTemperatureC: 31,
+        devicePowerW: 6_001,
+      },
+      context: {
+        ...baseline.context,
+        occupants: 101,
+        outsideTemperatureC: 61,
+        operatingHoursPerDay: 20,
+        operatingDaysPerMonth: 31,
+        operatingDaysPerYear: 30,
+        electricityPricePerKWh: 11,
+        carbonIntensityKgPerKWh: 11,
+      },
+      capturedAt: baseline.metadata.capturedAt,
+      provenance: baseline.metadata.provenance,
+    });
+
+    expect(runTwinDecisionPipeline(twin).metadata.baselineConfiguration).toEqual(
+      twinSnapshotToClassroomConfig(twin),
     );
   });
 

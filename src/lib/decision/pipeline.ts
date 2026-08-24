@@ -2,6 +2,7 @@ import { compareSimulationResults } from "../impact/impact";
 import { optimizeClassroomEnergy } from "../optimizer/optimizer";
 import { simulateClassroomEnergy, type ClassroomConfig } from "../simulation";
 import type { TwinSnapshot } from "../twin/types";
+import { assertValidClassroomConfig } from "../validation/classroomConfig";
 import { generateDecisionRecommendations } from "./recommendation";
 import {
   twinSnapshotToClassroomConfig,
@@ -19,6 +20,7 @@ export function runDecisionPipeline(
   config: Readonly<ClassroomConfig>,
   options: Readonly<DecisionPipelineOptions> = {},
 ): DecisionPackage {
+  assertValidClassroomConfig(config);
   const baselineConfiguration: ClassroomConfig = { ...config };
   const baselineSimulation = simulateClassroomEnergy(baselineConfiguration);
   const optimization = optimizeClassroomEnergy(

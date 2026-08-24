@@ -1,5 +1,9 @@
 import type { BuiltInScenarioId } from "../scenarios/types";
 import type { ClassroomConfig } from "../simulation";
+import {
+  ClassroomConfigValidationError,
+  parseClassroomConfigInput,
+} from "../validation/classroomConfig";
 
 export type ExplanationApiRequest =
   | {
@@ -11,30 +15,6 @@ export type ExplanationApiRequest =
       configuration: ClassroomConfig;
       scenarioId: BuiltInScenarioId;
     };
-
-const NUMBER_RANGES = {
-  roomAreaM2: [10, 250],
-  occupants: [0, 100],
-  outsideTemperatureC: [-10, 45],
-  thermostatTemperatureC: [16, 30],
-  operatingHoursPerDay: [0, 16],
-  operatingDaysPerMonth: [0, 31],
-  operatingDaysPerYear: [0, 366],
-  lightingLevelPercent: [0, 100],
-  lightingPowerDensityWPerM2: [0, 25],
-  devicePowerW: [0, 6_000],
-  electricityPricePerKWh: [0, 10],
-  carbonIntensityKgPerKWh: [0, 10],
-} as const satisfies Record<
-  Exclude<keyof ClassroomConfig, "hvacEnabled" | "lightsEnabled" | "devicesEnabled">,
-  readonly [number, number]
->;
-
-const BOOLEAN_KEYS = [
-  "hvacEnabled",
-  "lightsEnabled",
-  "devicesEnabled",
-] as const satisfies readonly (keyof ClassroomConfig)[];
 
 const SCENARIO_IDS: readonly BuiltInScenarioId[] = [
   "heatwave-tomorrow",
@@ -87,33 +67,14 @@ export function isExplanationResultStale(
 }
 
 function parseConfiguration(input: unknown): ClassroomConfig {
-  const value = requireRecord(input, "configuration");
-  requireExactKeys(value, [...Object.keys(NUMBER_RANGES), ...BOOLEAN_KEYS]);
-
-  const parsed = {} as ClassroomConfig;
-  for (const [key, [minimum, maximum]] of Object.entries(NUMBER_RANGES)) {
-    const candidate = value[key];
-    if (
-      typeof candidate !== "number" ||
-      !Number.isFinite(candidate) ||
-      candidate < minimum ||
-      candidate > maximum
-    ) {
-      throw new ExplanationRequestError(
-        `configuration.${key} must be a finite number from ${minimum} to ${maximum}.`,
-      );
+  try {
+    return parseClassroomConfigInput(input);
+  } catch (error) {
+    if (error instanceof ClassroomConfigValidationError) {
+      throw new ExplanationRequestError(error.message);
     }
-    (parsed as unknown as Record<string, number | boolean>)[key] = candidate;
+    throw error;
   }
-
-  for (const key of BOOLEAN_KEYS) {
-    if (typeof value[key] !== "boolean") {
-      throw new ExplanationRequestError(`configuration.${key} must be a boolean.`);
-    }
-    (parsed as unknown as Record<string, number | boolean>)[key] = value[key] as boolean;
-  }
-
-  return parsed;
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
