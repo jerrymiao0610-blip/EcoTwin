@@ -5,6 +5,10 @@ import {
 } from "../../../lib/explanation/apiRequest";
 import { buildEvidenceFromExplanationRequest } from "../../../lib/explanation/buildRequestEvidence";
 import {
+  CloudflareWorkersAiExplanationProvider,
+  DEFAULT_CLOUDFLARE_AI_MODEL,
+} from "../../../lib/explanation/cloudflareWorkersAiProvider";
+import {
   DEFAULT_GEMINI_MODEL,
   GeminiExplanationProvider,
 } from "../../../lib/explanation/geminiProvider";
@@ -38,10 +42,21 @@ export async function POST(request: Request) {
 
 function configuredProvider(): ExplanationProvider | undefined {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) return undefined;
+  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 
-  return new GeminiExplanationProvider({
-    apiKey,
-    model: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+  if (apiKey) {
+    return new GeminiExplanationProvider({ apiKey, model });
+  }
+
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (!accountId || !apiToken) return undefined;
+
+  return new CloudflareWorkersAiExplanationProvider({
+    accountId,
+    apiToken,
+    model:
+      process.env.CLOUDFLARE_AI_MODEL?.trim() ||
+      DEFAULT_CLOUDFLARE_AI_MODEL,
   });
 }
