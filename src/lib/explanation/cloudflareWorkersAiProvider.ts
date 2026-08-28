@@ -7,7 +7,7 @@ import type { ExplanationProvider } from "./provider";
 import type { ExplanationEvidence, ExplanationResult } from "./types";
 
 export const DEFAULT_CLOUDFLARE_AI_MODEL =
-  "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+  "@cf/meta/llama-3.1-8b-instruct-fast";
 
 interface CloudflareWorkersAiProviderOptions {
   accountId: string;
