@@ -28,7 +28,15 @@ export function explanationSourceLabel(source: Readonly<ExplanationSource>): str
 }
 
 export function fallbackStatusText(source: Readonly<ExplanationSource>): string {
-  if (source.kind === "ai") return "Gemini · grounded prose";
+  if (source.kind === "ai") {
+    if (source.providerId.startsWith("cloudflare-workers-ai/")) {
+      return "Workers AI · grounded prose";
+    }
+    if (source.providerId.startsWith("google-gemini/")) {
+      return "Gemini · grounded prose";
+    }
+    return "AI provider · grounded prose";
+  }
   if (source.fallbackReason === "provider-not-configured") {
     return "Offline evidence summary · provider not configured";
   }

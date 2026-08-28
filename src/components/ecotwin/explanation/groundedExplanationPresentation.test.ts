@@ -31,6 +31,17 @@ describe("grounded explanation presentation", () => {
     expect(fallbackStatusText(source)).toContain("Gemini");
   });
 
+  it("identifies Workers AI without claiming Gemini", () => {
+    const source = {
+      kind: "ai" as const,
+      providerId: "cloudflare-workers-ai/@cf/meta/test-model",
+      fallbackReason: null,
+    };
+
+    expect(fallbackStatusText(source)).toBe("Workers AI · grounded prose");
+    expect(fallbackStatusText(source)).not.toContain("Gemini");
+  });
+
   it("creates only the narrow Current and built-in scenario requests", () => {
     expect(currentExplanationRequest(DEFAULT_CLASSROOM_CONFIG)).toEqual({
       mode: "current-decision",
