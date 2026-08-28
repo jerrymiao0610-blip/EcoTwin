@@ -105,6 +105,33 @@ describe("CloudflareWorkersAiExplanationProvider", () => {
     );
   });
 
+  it("replaces only unsafe numerical prose with grounded deterministic wording", async () => {
+    const evidence = currentEvidence();
+    const prose = proseFor(evidence);
+    prose.summary = "This summary improperly repeats 42 as a model result.";
+
+    const result = await explainEvidence(
+      evidence,
+      new CloudflareWorkersAiExplanationProvider({
+        accountId: "test-account-id",
+        apiToken: "test-cloudflare-token",
+        fetchImplementation: async () => new Response(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify(prose) } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      }),
+    );
+
+    expect(result.source.kind).toBe("ai");
+    expect(result.summary).toBe(createDeterministicExplanation(evidence).summary);
+    expect(result.whyItChanged[0].explanation).toBe(
+      prose.reasonExplanations[0],
+    );
+    expect(result.summary).not.toMatch(/\d/u);
+  });
+
   it("falls back deterministically when Workers AI is unavailable", async () => {
     const evidence = currentEvidence();
     const result = await explainEvidence(
