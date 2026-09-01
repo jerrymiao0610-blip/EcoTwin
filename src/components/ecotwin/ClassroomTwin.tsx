@@ -1,4 +1,9 @@
 import type { CSSProperties } from "react";
+import type {
+  EdgeNodeConnectionStatus,
+  EdgeNodeFreshness,
+  EdgeNodeTelemetry,
+} from "@/lib/hardware/types";
 import type { ClassroomConfig, SimulationResult } from "@/lib/simulation";
 import { AnimatedNumber } from "./AnimatedNumber";
 
@@ -27,6 +32,9 @@ type Props = {
   feedbackKey?: TwinFeedbackKey;
   feedbackToken?: number;
   scenarioTitle?: string | null;
+  edgeNodeTelemetry?: EdgeNodeTelemetry | null;
+  edgeNodeConnectionStatus?: EdgeNodeConnectionStatus;
+  edgeNodeFreshness?: EdgeNodeFreshness | null;
 };
 
 const formatEnergy = (value: number) => value.toFixed(1);
@@ -45,7 +53,7 @@ export function twinHvacPresentationState(
   };
 }
 
-export function ClassroomTwin({ config, result, highlightedItems = [], causalFocus = null, feedbackKey = null, feedbackToken = 0, scenarioTitle = null }: Props) {
+export function ClassroomTwin({ config, result, highlightedItems = [], causalFocus = null, feedbackKey = null, feedbackToken = 0, scenarioTitle = null, edgeNodeTelemetry = null, edgeNodeConnectionStatus = "disconnected", edgeNodeFreshness = null }: Props) {
   const withinOperatingSchedule = config.operatingHoursPerDay > 0;
   const occupants = config.occupants > 0 ? Math.min(12, Math.max(1, Math.round(config.occupants / 3))) : 0;
   const lightingLevel = config.lightsEnabled ? Math.min(1, Math.max(0, config.lightingLevelPercent / 100)) : 0;
@@ -87,6 +95,13 @@ export function ClassroomTwin({ config, result, highlightedItems = [], causalFoc
     : withinOperatingSchedule
       ? "Current state"
       : "Schedule idle";
+  const edgeNodeStatusLabel = edgeNodeConnectionStatus === "connected"
+    ? edgeNodeFreshness === "live"
+      ? "LIVE"
+      : edgeNodeFreshness === "stale"
+        ? "STALE"
+        : "NO RECENT DATA"
+    : "DISCONNECTED";
 
   return (
     <section className="twin-panel" aria-labelledby="twin-title">
@@ -118,6 +133,14 @@ export function ClassroomTwin({ config, result, highlightedItems = [], causalFoc
         <div className={`room-label${roomFeedback ? " twin-state-feedback" : ""}`} key={`room-${roomFeedback ? feedbackToken : 0}`}>
           <strong>INTERACTIVE CLASSROOM</strong><span>{config.roomAreaM2} m²</span><span className="room-occupancy">{config.occupants} people</span>
         </div>
+
+        {edgeNodeTelemetry ? (
+          <div className={`edge-node-twin-telemetry freshness-${edgeNodeFreshness ?? "no-recent-data"}`} role="status" aria-label={`EcoTwin Edge Node. Measured temperature ${edgeNodeTelemetry.temperatureC} degrees Celsius. Measured humidity ${edgeNodeTelemetry.humidityPercent} percent relative humidity. ${edgeNodeStatusLabel}.`}>
+            <span>EDGE NODE</span>
+            <strong><AnimatedNumber value={edgeNodeTelemetry.temperatureC} />°C <i>·</i> <AnimatedNumber value={edgeNodeTelemetry.humidityPercent} maximumFractionDigits={1} />% RH</strong>
+            <em>{edgeNodeStatusLabel}</em>
+          </div>
+        ) : null}
 
         <div className="thermal-guide" aria-hidden="true"><span>OUTSIDE</span><i /><b>ROOM TARGET</b></div>
         <div className="window" aria-hidden="true"><span /><i /><i /></div>

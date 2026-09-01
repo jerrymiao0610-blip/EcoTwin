@@ -19,6 +19,8 @@ import { DecisionSnapshot } from "./DecisionSnapshot";
 import { EnergyBreakdown, type BreakdownCategory } from "./EnergyBreakdown";
 import { ExplanationPanel } from "./ExplanationPanel";
 import { GroundedExplanation } from "./explanation/GroundedExplanation";
+import { EdgeNodePanel } from "./hardware/EdgeNodePanel";
+import { useEdgeNodeSerial } from "./hardware/useEdgeNodeSerial";
 import { MetricCard } from "./MetricCard";
 import { PeriodSelector, type Period } from "./PeriodSelector";
 import { ScenarioDecisionFlow } from "./scenarios/ScenarioDecisionFlow";
@@ -49,6 +51,7 @@ export function EcoTwinDashboard() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const weatherController = useRef<AbortController | null>(null);
+  const edgeNode = useEdgeNodeSerial();
   const { result, workspace } = useMemo(() => {
     const decision = runDecisionPipeline(config);
 
@@ -183,9 +186,12 @@ export function EcoTwinDashboard() {
       <TwinJourneyRail />
 
       <section className={`mission-stage ${activeScenario ? "scenario-mission-stage" : ""}`} aria-label="Classroom digital twin mission view">
-        <ScenarioSelector baseline={config} models={scenarioModels} selectedId={selectedScenarioId} onChange={selectScenario} />
+        <div className="real-world-stage">
+          <EdgeNodePanel session={edgeNode} />
+          <ScenarioSelector baseline={config} models={scenarioModels} selectedId={selectedScenarioId} onChange={selectScenario} />
+        </div>
         <div className="twin-system">
-          <ClassroomTwin config={activeConfig} result={activeTwinResult} highlightedItems={highlightedItems} causalFocus={causalFocus} feedbackKey={feedback.key} feedbackToken={feedback.token} scenarioTitle={activeScenario?.title ?? null} />
+          <ClassroomTwin config={activeConfig} result={activeTwinResult} highlightedItems={highlightedItems} causalFocus={causalFocus} feedbackKey={feedback.key} feedbackToken={feedback.token} scenarioTitle={activeScenario?.title ?? null} edgeNodeTelemetry={edgeNode.telemetry} edgeNodeConnectionStatus={edgeNode.status} edgeNodeFreshness={edgeNode.freshness} />
         </div>
         {activeScenario && activeScenarioResponse ? (
           <ScenarioDecisionFlow scenario={activeScenario} response={activeScenarioResponse} />
