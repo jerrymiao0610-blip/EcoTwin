@@ -27,13 +27,22 @@ export async function createContextSnapshot(
     const weather = await weatherProvider.getCurrentWeather(location);
     assertWeatherReading(weather);
 
-    return {
+    const snapshot: ContextSnapshot = {
       location: { ...location },
       temperature: weather.temperature,
       source: weather.source,
       timestamp: weather.timestamp,
       warnings: [],
     };
+    if (weather.relativeHumidityPercent !== undefined) {
+      assertRelativeHumidity(weather.relativeHumidityPercent);
+      snapshot.relativeHumidityPercent = weather.relativeHumidityPercent;
+    }
+    if (weather.pressureKPa !== undefined) {
+      assertPositivePressure(weather.pressureKPa);
+      snapshot.pressureKPa = weather.pressureKPa;
+    }
+    return snapshot;
   } catch {
     const timestamp = (options.now ?? (() => new Date()))().toISOString();
 
@@ -52,6 +61,18 @@ function assertWeatherReading(weather: Readonly<WeatherReading>): void {
 
   if (Number.isNaN(Date.parse(weather.timestamp))) {
     throw new TypeError("Weather provider timestamp must be valid ISO 8601.");
+  }
+}
+
+function assertRelativeHumidity(value: number): void {
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new TypeError("Weather provider relative humidity must be from 0 to 100.");
+  }
+}
+
+function assertPositivePressure(value: number): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new TypeError("Weather provider pressure must be positive and finite.");
   }
 }
 

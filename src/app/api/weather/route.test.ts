@@ -7,7 +7,12 @@ describe("POST /api/weather", () => {
 
   it("returns validated Open-Meteo context for the honest reference location", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      current: { temperature_2m: 28.4, time: "2026-08-24T08:15" },
+      current: {
+        temperature_2m: 28.4,
+        relative_humidity_2m: 72,
+        surface_pressure: 1006.4,
+        time: "2026-08-24T08:15",
+      },
     }), { status: 200 })));
 
     const response = await POST(jsonRequest({ manualFallbackTemperature: 24 }));
@@ -22,6 +27,8 @@ describe("POST /api/weather", () => {
         longitude: 121.4737,
       },
       temperature: 28.4,
+      relativeHumidityPercent: 72,
+      pressureKPa: 100.64,
       source: "open-meteo",
       timestamp: "2026-08-24T08:15:00.000Z",
       warnings: [],

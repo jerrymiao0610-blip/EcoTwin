@@ -10,6 +10,10 @@ export interface ContextSnapshot {
   location: Location;
   /** Outside air temperature in degrees Celsius. */
   temperature: number;
+  /** Outside relative humidity when explicitly supplied by weather/manual context. */
+  relativeHumidityPercent?: number;
+  /** Surface pressure in kPa when supplied by weather/manual context. */
+  pressureKPa?: number;
   source: WeatherSource;
   /** ISO 8601 time at which the temperature value applies. */
   timestamp: string;

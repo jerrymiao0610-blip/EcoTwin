@@ -11,6 +11,10 @@ export type WeatherSource = "open-meteo" | "manual";
 export interface WeatherReading {
   /** Air temperature in degrees Celsius. */
   temperature: number;
+  /** Current relative humidity when supplied by the provider. */
+  relativeHumidityPercent?: number;
+  /** Current surface pressure in kPa when supplied by the provider. */
+  pressureKPa?: number;
   source: WeatherSource;
   /** ISO 8601 time at which the weather value applies. */
   timestamp: string;

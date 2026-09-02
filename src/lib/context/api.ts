@@ -32,13 +32,15 @@ export function parseWeatherContextApiRequest(
 /** Validates the network response again before it can update dashboard state. */
 export function parseWeatherContextApiResponse(input: unknown): ContextSnapshot {
   const value = requireRecord(input, "Weather response");
-  requireExactKeys(value, [
+  requireAllowedKeys(value, [
     "location",
     "temperature",
+    "relativeHumidityPercent",
+    "pressureKPa",
     "source",
     "timestamp",
     "warnings",
-  ]);
+  ], ["location", "temperature", "source", "timestamp", "warnings"]);
   const location = parseLocation(value.location);
   assertInputTemperature(value.temperature, "temperature");
   if (value.source !== "open-meteo" && value.source !== "manual") {
@@ -57,28 +59,45 @@ export function parseWeatherContextApiResponse(input: unknown): ContextSnapshot 
     throw new WeatherContextApiError("Weather response warnings are invalid.");
   }
 
-  return {
+  const context: ContextSnapshot = {
     location,
     temperature: value.temperature as number,
     source: value.source,
     timestamp: value.timestamp,
     warnings: [...value.warnings],
   };
+  if (value.relativeHumidityPercent !== undefined) {
+    assertRelativeHumidity(value.relativeHumidityPercent);
+    context.relativeHumidityPercent = value.relativeHumidityPercent as number;
+  }
+  if (value.pressureKPa !== undefined) {
+    assertPressure(value.pressureKPa);
+    context.pressureKPa = value.pressureKPa as number;
+  }
+  return context;
 }
 
 export function createClientManualContext(
   location: Readonly<Location>,
   manualTemperature: number,
   now: () => Date = () => new Date(),
+  relativeHumidityPercent?: number,
 ): ContextSnapshot {
   assertInputTemperature(manualTemperature, "manual temperature");
-  return {
+  if (relativeHumidityPercent !== undefined) {
+    assertRelativeHumidity(relativeHumidityPercent);
+  }
+  const context: ContextSnapshot = {
     location: { ...location },
     temperature: manualTemperature,
     source: "manual",
     timestamp: now().toISOString(),
     warnings: [WEATHER_CLIENT_FALLBACK_WARNING],
   };
+  if (relativeHumidityPercent !== undefined) {
+    context.relativeHumidityPercent = relativeHumidityPercent;
+  }
+  return context;
 }
 
 function parseLocation(input: unknown): Location {
@@ -131,16 +150,40 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function requireAllowedKeys(
+  value: Readonly<Record<string, unknown>>,
+  allowedKeys: readonly string[],
+  requiredKeys: readonly string[],
+): void {
+  const actual = Object.keys(value);
+  if (actual.some((key) => !allowedKeys.includes(key))) {
+    throw new WeatherContextApiError("Weather payload contains unsupported fields.");
+  }
+  if (requiredKeys.some((key) => !actual.includes(key))) {
+    throw new WeatherContextApiError("Weather payload is missing required fields.");
+  }
+}
+
 function requireExactKeys(
   value: Readonly<Record<string, unknown>>,
   expectedKeys: readonly string[],
 ): void {
-  const actual = Object.keys(value).sort();
-  const expected = [...expectedKeys].sort();
-  if (
-    actual.length !== expected.length ||
-    actual.some((key, index) => key !== expected[index])
-  ) {
+  requireAllowedKeys(value, expectedKeys, expectedKeys);
+  if (Object.keys(value).length !== expectedKeys.length) {
     throw new WeatherContextApiError("Weather payload contains unsupported fields.");
+  }
+}
+
+function assertRelativeHumidity(value: unknown): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new WeatherContextApiError(
+      "relativeHumidityPercent must be a finite value from 0 to 100.",
+    );
+  }
+}
+
+function assertPressure(value: unknown): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new WeatherContextApiError("pressureKPa must be positive and finite.");
   }
 }

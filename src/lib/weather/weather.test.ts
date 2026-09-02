@@ -11,6 +11,8 @@ describe("OpenMeteoWeatherProvider", () => {
         JSON.stringify({
           current: {
             temperature_2m: 27.4,
+            relative_humidity_2m: 63,
+            surface_pressure: 1008.6,
             time: "2026-08-22T08:15",
           },
         }),
@@ -26,6 +28,8 @@ describe("OpenMeteoWeatherProvider", () => {
 
     expect(weather).toEqual({
       temperature: 27.4,
+      relativeHumidityPercent: 63,
+      pressureKPa: 100.86,
       source: "open-meteo",
       timestamp: "2026-08-22T08:15:00.000Z",
     });
@@ -38,10 +42,25 @@ describe("OpenMeteoWeatherProvider", () => {
     expect(Object.fromEntries(requestUrl.searchParams)).toEqual({
       latitude: "31.2304",
       longitude: "121.4737",
-      current: "temperature_2m",
+      current: "temperature_2m,relative_humidity_2m,surface_pressure",
       temperature_unit: "celsius",
       timezone: "UTC",
     });
+  });
+
+  it("keeps legacy temperature available when RH and pressure are unavailable", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({
+        current: { temperature_2m: 21.5, time: "2026-08-22T08:15" },
+      }), { status: 200 }),
+    );
+    const provider = new OpenMeteoWeatherProvider({ fetch: fetcher });
+
+    const weather = await provider.getCurrentWeather({ latitude: 0, longitude: 0 });
+
+    expect(weather.temperature).toBe(21.5);
+    expect(weather.relativeHumidityPercent).toBeUndefined();
+    expect(weather.pressureKPa).toBeUndefined();
   });
 
   it("rejects failed API responses for the context layer to handle", async () => {

@@ -11,10 +11,36 @@ describe("weather client boundary", () => {
     expect(parseWeatherContextApiResponse({
       location: DEFAULT_WEATHER_LOCATION,
       temperature: 27.5,
+      relativeHumidityPercent: 61,
+      pressureKPa: 100.91,
       source: "open-meteo",
       timestamp: "2026-08-24T08:15:00.000Z",
       warnings: [],
-    })).toMatchObject({ temperature: 27.5, source: "open-meteo" });
+    })).toMatchObject({
+      temperature: 27.5,
+      relativeHumidityPercent: 61,
+      pressureKPa: 100.91,
+      source: "open-meteo",
+    });
+  });
+
+  it("rejects invalid optional humidity and pressure fields", () => {
+    const base = {
+      location: DEFAULT_WEATHER_LOCATION,
+      temperature: 27.5,
+      source: "open-meteo",
+      timestamp: "2026-08-24T08:15:00.000Z",
+      warnings: [],
+    };
+
+    expect(() => parseWeatherContextApiResponse({
+      ...base,
+      relativeHumidityPercent: 101,
+    })).toThrow("relativeHumidityPercent");
+    expect(() => parseWeatherContextApiResponse({
+      ...base,
+      pressureKPa: 0,
+    })).toThrow("pressureKPa");
   });
 
   it("rejects malformed network data before it can update the model", () => {

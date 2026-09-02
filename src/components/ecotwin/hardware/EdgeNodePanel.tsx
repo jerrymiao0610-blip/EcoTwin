@@ -29,7 +29,15 @@ type EdgeNodePanelSession = Pick<
   | "disconnect"
 >;
 
-export function EdgeNodePanelView({ session }: { session: EdgeNodePanelSession }) {
+export interface EdgeNodeSensorModeControls {
+  readonly active: boolean;
+  readonly canActivate: boolean;
+  readonly activating: boolean;
+  readonly onActivate: () => void;
+  readonly onReturnToManual: () => void;
+}
+
+export function EdgeNodePanelView({ session, sensorMode }: { session: EdgeNodePanelSession; sensorMode?: EdgeNodeSensorModeControls }) {
   const { status, telemetry, freshness, updatedLabel, errorMessage } = session;
   const connected = status === "connected";
   const busy = status === "connecting" || status === "disconnecting";
@@ -89,16 +97,31 @@ export function EdgeNodePanelView({ session }: { session: EdgeNodePanelSession }
             )}
             <small>115200 baud · local browser only</small>
           </div>
+
+          {sensorMode && (sensorMode.active || sensorMode.canActivate) ? (
+            <button
+              type="button"
+              className="edge-node-mode-button"
+              onClick={sensorMode.active ? sensorMode.onReturnToManual : sensorMode.onActivate}
+              disabled={sensorMode.activating}
+            >
+              {sensorMode.active
+                ? "RETURN TO MANUAL MODE"
+                : sensorMode.activating
+                  ? "PREPARING SENSOR MODEL…"
+                  : "USE EDGE NODE IN DIGITAL TWIN"}
+            </button>
+          ) : null}
         </>
       )}
 
       <p className="edge-node-model-note">
-        Humidity is observed telemetry and is not yet included in the current educational HVAC energy equation.
+        Humidity remains separate from the legacy equation and contributes only after explicit sensor-mode activation.
       </p>
     </section>
   );
 }
 
-export function EdgeNodePanel({ session }: { session: EdgeNodeSerialSession }) {
-  return <EdgeNodePanelView session={session} />;
+export function EdgeNodePanel({ session, sensorMode }: { session: EdgeNodeSerialSession; sensorMode: EdgeNodeSensorModeControls }) {
+  return <EdgeNodePanelView session={session} sensorMode={sensorMode} />;
 }

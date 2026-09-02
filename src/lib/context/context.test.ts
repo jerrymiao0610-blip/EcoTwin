@@ -19,6 +19,8 @@ describe("createContextSnapshot", () => {
       async getCurrentWeather() {
         return {
           temperature: 28.5,
+          relativeHumidityPercent: 67,
+          pressureKPa: 100.7,
           source: "open-meteo",
           timestamp: "2026-08-22T09:00:00.000Z",
         };
@@ -32,6 +34,8 @@ describe("createContextSnapshot", () => {
     expect(snapshot).toEqual({
       location: SHANGHAI,
       temperature: 28.5,
+      relativeHumidityPercent: 67,
+      pressureKPa: 100.7,
       source: "open-meteo",
       timestamp: "2026-08-22T09:00:00.000Z",
       warnings: [],

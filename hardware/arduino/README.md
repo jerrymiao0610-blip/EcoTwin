@@ -5,9 +5,10 @@ EcoTwin Edge Node. It reads indoor temperature and humidity from a DHT sensor,
 shows the observed values on a 128x64 I2C OLED, and emits the same values over
 USB Serial for EcoTwin's browser-local Web Serial connection.
 
-The browser telemetry remains separate from `ClassroomConfig` and reference
-weather. Indoor humidity is observed context only and is not used by the
-current educational HVAC energy equation.
+The browser reads telemetry locally and does not upload it to a cloud telemetry
+service. Indoor temperature and humidity remain separate from the legacy
+`ClassroomConfig` simulation; they contribute only after the user explicitly
+activates the sensor-informed modeled estimate.
 
 ## Hardware and libraries
 
@@ -15,7 +16,8 @@ current educational HVAC energy equation.
 - Sensor: **DHT11** by default
 - Sensor data pin: digital pin **7** (confirmed by hardware probe)
 - OLED: 128x64 SSD1306 over I2C
-- OLED address: detected once at startup, trying `0x3C` and then `0x3D`
+- OLED address: **`0x3C`** on the confirmed prototype; firmware checks `0x3C`
+  first and retains `0x3D` as a compatibility fallback
 - USB Serial: **115200 baud**
 
 Install these libraries from Arduino IDE's Library Manager:

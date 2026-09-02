@@ -15,6 +15,8 @@ export interface OpenMeteoWeatherProviderOptions {
 interface OpenMeteoResponse {
   current?: {
     temperature_2m?: unknown;
+    relative_humidity_2m?: unknown;
+    surface_pressure?: unknown;
     time?: unknown;
   };
 }
@@ -27,7 +29,7 @@ export class WeatherProviderError extends Error {
   }
 }
 
-/** Open-Meteo adapter for provider-neutral current temperature readings. */
+/** Open-Meteo adapter for provider-neutral current environmental readings. */
 export class OpenMeteoWeatherProvider implements WeatherProvider {
   private readonly fetcher: typeof globalThis.fetch;
   private readonly endpoint: string;
@@ -47,7 +49,10 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
     const url = new URL(this.endpoint);
     url.searchParams.set("latitude", String(location.latitude));
     url.searchParams.set("longitude", String(location.longitude));
-    url.searchParams.set("current", "temperature_2m");
+    url.searchParams.set(
+      "current",
+      "temperature_2m,relative_humidity_2m,surface_pressure",
+    );
     url.searchParams.set("temperature_unit", "celsius");
     url.searchParams.set("timezone", "UTC");
 
@@ -71,6 +76,8 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
 
     const payload = (await response.json()) as OpenMeteoResponse;
     const temperature = payload.current?.temperature_2m;
+    const relativeHumidity = payload.current?.relative_humidity_2m;
+    const surfacePressureHPa = payload.current?.surface_pressure;
     const time = payload.current?.time;
 
     if (typeof temperature !== "number" || !Number.isFinite(temperature)) {
@@ -85,11 +92,27 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
       );
     }
 
-    return {
+    const reading: WeatherReading = {
       temperature,
       source: "open-meteo",
       timestamp: normalizeUtcTimestamp(time),
     };
+    if (
+      typeof relativeHumidity === "number" &&
+      Number.isFinite(relativeHumidity) &&
+      relativeHumidity >= 0 &&
+      relativeHumidity <= 100
+    ) {
+      reading.relativeHumidityPercent = relativeHumidity;
+    }
+    if (
+      typeof surfacePressureHPa === "number" &&
+      Number.isFinite(surfacePressureHPa) &&
+      surfacePressureHPa > 0
+    ) {
+      reading.pressureKPa = surfacePressureHPa / 10;
+    }
+    return reading;
   }
 }
 

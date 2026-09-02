@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { runDecisionPipeline } from "@/lib/decision/pipeline";
 import {
   createClientManualContext,
@@ -8,6 +8,18 @@ import {
 } from "@/lib/context/api";
 import { DEFAULT_WEATHER_LOCATION } from "@/lib/context/defaults";
 import type { ContextSnapshot } from "@/lib/context/types";
+import type { EdgeNodeTelemetry } from "@/lib/hardware/types";
+import {
+  buildSensorEnvironmentalSnapshot,
+  canActivateSensorMode,
+  getActiveSensorModeHealth,
+  MissingOutdoorHumidityError,
+  shouldRecomputeSensorEstimate,
+} from "@/lib/sensor-mode";
+import {
+  simulateSensorInformedClassroomEnergy,
+  type SensorInformedSimulationResult,
+} from "@/lib/sensor-simulation";
 import { DEFAULT_CLASSROOM_CONFIG, type ClassroomConfig } from "@/lib/simulation";
 import { normalizeClassroomConfigEdit } from "@/lib/validation/classroomConfig";
 import { buildScenarioWorkspaceModels } from "@/lib/workspace/buildScenarioWorkspace";
@@ -20,6 +32,7 @@ import { EnergyBreakdown, type BreakdownCategory } from "./EnergyBreakdown";
 import { ExplanationPanel } from "./ExplanationPanel";
 import { GroundedExplanation } from "./explanation/GroundedExplanation";
 import { EdgeNodePanel } from "./hardware/EdgeNodePanel";
+import { SensorInformedEstimate } from "./hardware/SensorInformedEstimate";
 import { useEdgeNodeSerial } from "./hardware/useEdgeNodeSerial";
 import { MetricCard } from "./MetricCard";
 import { PeriodSelector, type Period } from "./PeriodSelector";
@@ -49,8 +62,17 @@ export function EcoTwinDashboard() {
   const [causalFocus, setCausalFocus] = useState<BreakdownCategory | null>(null);
   const [weatherContext, setWeatherContext] = useState<ContextSnapshot | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [manualOutdoorRh, setManualOutdoorRh] = useState<number | null>(null);
+  const [sensorModeActive, setSensorModeActive] = useState(false);
+  const [sensorModeActivating, setSensorModeActivating] = useState(false);
+  const [sensorDataStale, setSensorDataStale] = useState(false);
+  const [sensorResult, setSensorResult] = useState<SensorInformedSimulationResult | null>(null);
+  const [sensorModeWarning, setSensorModeWarning] = useState<string | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const weatherController = useRef<AbortController | null>(null);
+  const lastSensorTelemetry = useRef<EdgeNodeTelemetry | null>(null);
+  const lastSensorComputedAtMs = useRef<number | null>(null);
+  const lastSensorInputsKey = useRef<string | null>(null);
   const edgeNode = useEdgeNodeSerial();
   const { result, workspace } = useMemo(() => {
     const decision = runDecisionPipeline(config);
@@ -70,7 +92,20 @@ export function EcoTwinDashboard() {
   );
   const activeSummary = activeScenario?.scenario ?? workspace.baseline;
   const activeConfig = activeSummary.configuration;
-  const activeTwinResult = {
+  const sensorIsPrimary = sensorModeActive && sensorResult !== null && activeScenario === null;
+  const activeTwinResult = sensorIsPrimary ? {
+    dailyEnergyKWh: sensorResult.dailyEnergyKWh,
+    hvacEnergyKWh: sensorResult.totalHvacElectricityKWh,
+    lightingEnergyKWh: sensorResult.lightingEnergyKWh,
+    deviceEnergyKWh: sensorResult.deviceEnergyKWh,
+    hvacMode: sensorResult.hvac.detailedMode === "off"
+      ? "off" as const
+      : sensorResult.hvac.detailedMode === "idle"
+        ? "idle" as const
+        : sensorResult.hvac.detailedMode.startsWith("heating")
+          ? "heating" as const
+          : "cooling" as const,
+  } : {
     dailyEnergyKWh: activeSummary.energyKWh.daily,
     hvacEnergyKWh: activeSummary.dailyEnergyByComponent.hvacKWh,
     lightingEnergyKWh: activeSummary.dailyEnergyByComponent.lightingKWh,
@@ -98,6 +133,13 @@ export function EcoTwinDashboard() {
     triggerFeedback("period");
   };
   const selectScenario = (nextScenarioId: ScenarioSelectionId) => {
+    if (sensorModeActive && nextScenarioId !== "current") {
+      setSensorModeActive(false);
+      setSensorDataStale(false);
+      setSensorModeWarning(
+        "Sensor-driven mode returned to manual because H3A does not apply humidity modeling to scenarios.",
+      );
+    }
     setCausalFocus(null);
     setSelectedScenarioId(nextScenarioId);
     triggerFeedback("scenario");
@@ -109,10 +151,15 @@ export function EcoTwinDashboard() {
     setConfig(DEFAULT_CLASSROOM_CONFIG);
     setWeatherContext(null);
     setWeatherLoading(false);
+    setManualOutdoorRh(null);
+    setSensorModeActive(false);
+    setSensorDataStale(false);
+    setSensorResult(null);
+    setSensorModeWarning(null);
     triggerFeedback("reset");
   };
 
-  const refreshWeather = async () => {
+  const refreshWeather = async (): Promise<ContextSnapshot | null> => {
     const controller = new AbortController();
     const fallbackTemperature = config.outsideTemperatureC;
     weatherController.current?.abort();
@@ -138,14 +185,17 @@ export function EcoTwinDashboard() {
       );
       setWeatherContext(context);
       triggerFeedback("outsideTemperatureC");
+      return context;
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setWeatherContext(
-        createClientManualContext(
-          DEFAULT_WEATHER_LOCATION,
-          fallbackTemperature,
-        ),
+      if (error instanceof DOMException && error.name === "AbortError") return null;
+      const fallback = createClientManualContext(
+        DEFAULT_WEATHER_LOCATION,
+        fallbackTemperature,
+        () => new Date(),
+        manualOutdoorRh ?? undefined,
       );
+      setWeatherContext(fallback);
+      return fallback;
     } finally {
       if (weatherController.current === controller) {
         weatherController.current = null;
@@ -153,6 +203,128 @@ export function EcoTwinDashboard() {
       }
     }
   };
+
+  const computeSensorResult = useCallback((
+    telemetry: Readonly<EdgeNodeTelemetry>,
+    context: Readonly<ContextSnapshot> | null = weatherContext,
+  ) => {
+    const environment = buildSensorEnvironmentalSnapshot({
+      config,
+      telemetry,
+      weatherContext: context,
+      manualOutdoorRelativeHumidityPercent: manualOutdoorRh,
+    });
+    return simulateSensorInformedClassroomEnergy(
+      config,
+      environment.snapshot,
+      undefined,
+      environment.warnings,
+    );
+  }, [config, manualOutdoorRh, weatherContext]);
+
+  const activateSensorMode = async () => {
+    if (!canActivateSensorMode(edgeNode.status, edgeNode.freshness, edgeNode.telemetry)) {
+      setSensorModeWarning("Fresh, connected Edge Node telemetry is required before sensor-driven mode can activate.");
+      return;
+    }
+    const activationTelemetry = edgeNode.telemetry;
+    if (activationTelemetry === null) return;
+    setSensorModeActivating(true);
+    setSensorModeWarning(null);
+    try {
+      let context = weatherContext;
+      if (context?.relativeHumidityPercent === undefined && manualOutdoorRh === null) {
+        context = await refreshWeather();
+      }
+      const nextResult = computeSensorResult(activationTelemetry, context);
+      const computedAt = Date.now();
+      setSensorResult(nextResult);
+      setSensorModeActive(true);
+      setSensorDataStale(false);
+      setSelectedScenarioId("current");
+      lastSensorTelemetry.current = activationTelemetry;
+      lastSensorComputedAtMs.current = computedAt;
+      lastSensorInputsKey.current = getSensorInputsKey(config, context, manualOutdoorRh);
+    } catch (error) {
+      setSensorModeActive(false);
+      setSensorModeWarning(
+        error instanceof MissingOutdoorHumidityError
+          ? error.message
+          : "EcoTwin could not create a valid sensor-informed environmental model.",
+      );
+    } finally {
+      setSensorModeActivating(false);
+    }
+  };
+
+  const returnToManualMode = () => {
+    setSensorModeActive(false);
+    setSensorDataStale(false);
+    setSensorResult(null);
+    setSensorModeWarning(null);
+    lastSensorTelemetry.current = null;
+    lastSensorComputedAtMs.current = null;
+    lastSensorInputsKey.current = null;
+  };
+
+  useEffect(() => {
+    if (!sensorModeActive) return;
+    const timer = window.setTimeout(() => {
+      const health = getActiveSensorModeHealth(edgeNode.status, edgeNode.freshness);
+      if (health === "fallback-to-manual") {
+        setSensorModeActive(false);
+        setSensorDataStale(false);
+        setSensorModeWarning(
+          "Edge Node disconnected or became invalid. Modeling returned to legacy/manual mode; the previous estimate remains visible for reference.",
+        );
+        return;
+      }
+      if (health === "stale" || edgeNode.telemetry === null) {
+        setSensorDataStale(true);
+        return;
+      }
+      setSensorDataStale(false);
+      const nowMs = Date.now();
+      const inputsKey = getSensorInputsKey(config, weatherContext, manualOutdoorRh);
+      const nonTelemetryInputsChanged = lastSensorInputsKey.current !== inputsKey;
+      if (
+        !nonTelemetryInputsChanged &&
+        !shouldRecomputeSensorEstimate(
+          lastSensorTelemetry.current,
+          edgeNode.telemetry,
+          lastSensorComputedAtMs.current,
+          nowMs,
+        )
+      ) {
+        return;
+      }
+      try {
+        const nextResult = computeSensorResult(edgeNode.telemetry);
+        setSensorResult(nextResult);
+        setSensorModeWarning(null);
+        lastSensorTelemetry.current = edgeNode.telemetry;
+        lastSensorComputedAtMs.current = nowMs;
+        lastSensorInputsKey.current = inputsKey;
+      } catch (error) {
+        setSensorModeActive(false);
+        setSensorModeWarning(
+          error instanceof MissingOutdoorHumidityError
+            ? error.message
+            : "Sensor data became invalid. Modeling returned to legacy/manual mode.",
+        );
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    computeSensorResult,
+    config,
+    edgeNode.freshness,
+    edgeNode.status,
+    edgeNode.telemetry,
+    manualOutdoorRh,
+    sensorModeActive,
+    weatherContext,
+  ]);
 
   useEffect(() => () => {
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
@@ -187,7 +359,13 @@ export function EcoTwinDashboard() {
 
       <section className={`mission-stage ${activeScenario ? "scenario-mission-stage" : ""}`} aria-label="Classroom digital twin mission view">
         <div className="real-world-stage">
-          <EdgeNodePanel session={edgeNode} />
+          <EdgeNodePanel session={edgeNode} sensorMode={{
+            active: sensorModeActive,
+            canActivate: canActivateSensorMode(edgeNode.status, edgeNode.freshness, edgeNode.telemetry),
+            activating: sensorModeActivating,
+            onActivate: () => void activateSensorMode(),
+            onReturnToManual: returnToManualMode,
+          }} />
           <ScenarioSelector baseline={config} models={scenarioModels} selectedId={selectedScenarioId} onChange={selectScenario} />
         </div>
         <div className="twin-system">
@@ -199,6 +377,16 @@ export function EcoTwinDashboard() {
           <DecisionSnapshot model={workspace} />
         )}
       </section>
+
+      <SensorInformedEstimate
+        result={sensorResult}
+        active={sensorModeActive}
+        stale={sensorDataStale}
+        warning={sensorModeWarning}
+        operatingHoursPerDay={config.operatingHoursPerDay}
+        operatingDaysPerMonth={config.operatingDaysPerMonth}
+        operatingDaysPerYear={config.operatingDaysPerYear}
+      />
 
       {activeScenarioResponse ? <ScenarioResponseSnapshot model={activeScenarioResponse} /> : null}
       {activeScenarioResponse ? <ScenarioResponseEvidence model={activeScenarioResponse} onTwinFocusChange={setCausalFocus} /> : null}
@@ -220,15 +408,22 @@ export function EcoTwinDashboard() {
       <section className="simulation-instruments" aria-labelledby="simulation-instruments-title">
         <header className="instrument-header">
           <div><span className="eyebrow">{activeScenario ? `${activeScenario.title} instruments` : "Simulation instruments"}</span><h2 id="simulation-instruments-title">Modeled footprint</h2></div>
-          <PeriodSelector period={period} onChange={updatePeriod} />
+          {sensorIsPrimary ? (
+            <div className="sensor-current-period">
+              <span>Current-condition scenario</span>
+              <small>Daily · {config.operatingHoursPerDay} modeled hours</small>
+            </div>
+          ) : (
+            <PeriodSelector period={period} onChange={updatePeriod} />
+          )}
         </header>
         <div className="metrics-grid" aria-label="Core impact metrics">
-          <MetricCard label="MODELED ENERGY" value={activeSummary.energyKWh[period]} unit="kWh" detail={periodLabels[period]} tone="energy" classification="Primary output" feedback={coreMetricsChanged} />
+          <MetricCard label={sensorIsPrimary ? "SENSOR-INFORMED MODELED ESTIMATE" : "MODELED ENERGY"} value={sensorIsPrimary ? sensorResult.dailyEnergyKWh : activeSummary.energyKWh[period]} unit="kWh" detail={sensorIsPrimary ? `current-condition ${config.operatingHoursPerDay}-hour scenario` : periodLabels[period]} tone="energy" classification={sensorIsPrimary ? "Modeled estimate · not measured" : "Primary output"} feedback={coreMetricsChanged} />
           <section className="derived-metrics" aria-labelledby="derived-metrics-title">
             <div className="derived-metrics-heading"><span id="derived-metrics-title">Derived consequences</span><small>Calculated from modeled energy</small></div>
             <div className="derived-metrics-row">
-              <MetricCard label="CO₂" value={activeSummary.co2Kg[period]} unit="kg" detail={periodLabels[period]} tone="carbon" feedback={coreMetricsChanged} />
-              <MetricCard label="COST" value={activeSummary.cost[period]} maximumFractionDigits={2} prefix="$" unit="USD" detail={periodLabels[period]} tone="cost" feedback={coreMetricsChanged} />
+              <MetricCard label="CO₂" value={sensorIsPrimary ? sensorResult.dailyCO2Kg : activeSummary.co2Kg[period]} unit="kg" detail={sensorIsPrimary ? "current-condition scenario · daily" : periodLabels[period]} tone="carbon" feedback={coreMetricsChanged} />
+              <MetricCard label="COST" value={sensorIsPrimary ? sensorResult.dailyCost : activeSummary.cost[period]} maximumFractionDigits={2} prefix="$" unit="USD" detail={sensorIsPrimary ? "current-condition scenario · daily" : periodLabels[period]} tone="cost" feedback={coreMetricsChanged} />
             </div>
           </section>
           <MetricCard label="EFFICIENCY" value={activeSummary.ecoScore} maximumFractionDigits={0} unit="/ 100" detail="Supporting indicator" tone="score" classification="Heuristic" feedback={scoreChanged} />
@@ -236,10 +431,28 @@ export function EcoTwinDashboard() {
         <EnergyBreakdown result={activeTwinResult} highlightedItems={highlightedItems} feedbackToken={feedback.token} />
       </section>
 
-      <ClassroomControls config={config} onChange={update} onReset={reset} contextNote={activeScenario ? `Editing the unchanged Current baseline; ${activeScenario.title} updates from these inputs.` : undefined} weatherContext={weatherContext} weatherLoading={weatherLoading} weatherLocation={DEFAULT_WEATHER_LOCATION} onWeatherRefresh={refreshWeather} />
+      <ClassroomControls config={config} onChange={update} onReset={reset} contextNote={activeScenario ? `Editing the unchanged Current baseline; ${activeScenario.title} updates from these inputs.` : sensorModeActive ? "Sensor mode uses these classroom settings plus the environmental observations shown above." : undefined} weatherContext={weatherContext} weatherLoading={weatherLoading} weatherLocation={DEFAULT_WEATHER_LOCATION} onWeatherRefresh={() => void refreshWeather()} manualOutdoorRelativeHumidityPercent={manualOutdoorRh} onManualOutdoorRelativeHumidityChange={setManualOutdoorRh} />
       {activeScenario ? null : <ExplanationPanel result={result} />}
       {activeScenario ? null : <DecisionWorkspace model={workspace} onTwinFocusChange={setCausalFocus} />}
       <footer>EcoTwin results are modeled estimates for classroom decision-making.</footer>
     </main>
   );
+}
+
+function getSensorInputsKey(
+  config: Readonly<ClassroomConfig>,
+  context: Readonly<ContextSnapshot> | null,
+  manualOutdoorRh: number | null,
+): string {
+  return JSON.stringify({
+    config,
+    context: context ? {
+      temperature: context.temperature,
+      relativeHumidityPercent: context.relativeHumidityPercent,
+      pressureKPa: context.pressureKPa,
+      source: context.source,
+      timestamp: context.timestamp,
+    } : null,
+    manualOutdoorRh,
+  });
 }
