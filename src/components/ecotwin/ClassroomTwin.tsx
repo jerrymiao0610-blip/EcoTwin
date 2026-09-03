@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import type {
   EdgeNodeConnectionStatus,
   EdgeNodeFreshness,
@@ -15,6 +15,8 @@ type TwinProperties = CSSProperties & {
   "--device-strength": number;
   "--lighting-level": number;
   "--outdoor-heat": number;
+  "--parallax-rx": string;
+  "--parallax-ry": string;
 };
 
 type Props = {
@@ -74,6 +76,8 @@ export function ClassroomTwin({ config, result, highlightedItems = [], causalFoc
     "--device-strength": deviceStrength,
     "--lighting-level": lightingLevel,
     "--outdoor-heat": outdoorHeat,
+    "--parallax-rx": "0deg",
+    "--parallax-ry": "0deg",
   };
   const lightingState = !config.lightsEnabled ? "lights-off" : lightingLevel === 0 ? "lighting-zero" : lightingDrawingLoad ? "lights-on" : "lights-standby";
   const hvacFeedback = highlightedItems.includes("HVAC");
@@ -103,6 +107,28 @@ export function ClassroomTwin({ config, result, highlightedItems = [], causalFoc
         : "NO RECENT DATA"
     : "DISCONNECTED";
 
+  const resetParallax = (scene: HTMLDivElement) => {
+    scene.style.setProperty("--parallax-rx", "0deg");
+    scene.style.setProperty("--parallax-ry", "0deg");
+  };
+
+  const handleScenePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (
+      event.pointerType !== "mouse" ||
+      !window.matchMedia("(pointer: fine)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      resetParallax(event.currentTarget);
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const horizontal = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    const vertical = Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height));
+    event.currentTarget.style.setProperty("--parallax-rx", `${((0.5 - vertical) * 4.8).toFixed(2)}deg`);
+    event.currentTarget.style.setProperty("--parallax-ry", `${((horizontal - 0.5) * 6.4).toFixed(2)}deg`);
+  };
+
   return (
     <section className="twin-panel" aria-labelledby="twin-title">
       <div className="panel-heading twin-heading">
@@ -112,16 +138,57 @@ export function ClassroomTwin({ config, result, highlightedItems = [], causalFoc
         </div>
       </div>
 
-      <div className={`room-scene ${lightingState}${causalFocusClass}`} style={sceneStyle} role="img" aria-label={`Classroom twin. Outdoor temperature ${config.outsideTemperatureC} degrees Celsius. Room target ${config.thermostatTemperatureC} degrees Celsius. ${config.occupants} people. HVAC ${hvacState}. Lighting ${lightingStateLabel}. Devices ${devicesState}. Modeled energy ${formatEnergy(result.dailyEnergyKWh)} kilowatt-hours per day.`}>
+      <div
+        className={`room-scene spatial-room hvac-${hvacState} ${lightingState}${scenarioTitle ? " scenario-state" : ""}${causalFocusClass}`}
+        style={sceneStyle}
+        role="img"
+        aria-label={`Classroom twin. Outdoor temperature ${config.outsideTemperatureC} degrees Celsius. Room target ${config.thermostatTemperatureC} degrees Celsius. ${config.occupants} people. HVAC ${hvacState}. Lighting ${lightingStateLabel}. Devices ${devicesState}. Modeled energy ${formatEnergy(result.dailyEnergyKWh)} kilowatt-hours per day.`}
+        onPointerMove={handleScenePointerMove}
+        onPointerLeave={(event) => resetParallax(event.currentTarget)}
+      >
         <div className="twin-telemetry-grid" aria-hidden="true" />
         <div className="twin-reticle" aria-hidden="true"><i /><i /><i /><i /></div>
         <div className={`twin-focus-annunciator${causalFocus ? " active" : ""}${scenarioTitle ? " scenario-active" : ""}`} role="status" aria-live="polite">
           <span>{causalFocus ? "Recommendation focus" : modeledStateLabel}</span>
           <strong>{causalFocus ?? (scenarioTitle ? hvacState.toUpperCase() : withinOperatingSchedule ? "LIVE" : "IDLE")}</strong>
         </div>
-        <div className="room-wall" aria-hidden="true" />
-        <div className="room-ceiling" aria-hidden="true" />
-        <div className="room-floor" aria-hidden="true"><i /><i /><i /></div>
+        <div className="room-spatial-stage" aria-hidden="true">
+          <div className="room-atmosphere" />
+          <div className="room-wall"><i className="wall-seam" /><i className="wall-rail" /></div>
+          <div className="room-side-wall room-side-wall-left" />
+          <div className="room-side-wall room-side-wall-right" />
+          <div className="room-ceiling"><i /><i /></div>
+          <div className="room-floor"><i /><i /><i /><b /><b /></div>
+          <div className="window"><span /><i /><i /><b /><b /></div>
+
+          <div className={`ceiling-lights${lightingFeedback ? " twin-state-feedback" : ""}${lightingCausalFocus ? " twin-causal-target" : ""}`} key={`lighting-${lightingFeedback ? feedbackToken : 0}`}>
+            {[0, 1, 2].map((light) => <i className="ceiling-light" key={light}><b /></i>)}
+          </div>
+
+          <div className={`hvac-assembly${hvacFeedback ? " twin-state-feedback" : ""}${hvacCausalFocus ? " twin-causal-target" : ""}`} key={`hvac-${hvacFeedback ? feedbackToken : 0}`}>
+            <div className={`hvac-unit ${hvacState}${hvacDrawingLoad ? " active" : hvacState === "off" ? " inactive" : ""}`}><span>≋</span><small>HVAC</small><b>{hvacState.toUpperCase()}</b></div>
+            <svg className={`airflow-paths ${hvacState} ${hvacDrawingLoad ? "active" : "inactive"}`} viewBox="0 0 500 150" preserveAspectRatio="none">
+              <path d="M492 22 C421 18 430 73 343 70 S210 37 126 82 S47 113 8 103" />
+              <path d="M492 51 C430 57 417 112 326 104 S201 69 114 111 S39 137 10 129" />
+              <path d="M492 81 C435 87 398 139 317 134 S205 107 143 132" />
+            </svg>
+          </div>
+
+          <div className={`desks${occupancyFeedback ? " twin-state-feedback" : ""}`} key={`occupancy-${occupancyFeedback ? feedbackToken : 0}`}>
+            {Array.from({ length: 12 }, (_, index) => (
+              <div className={`desk ${index < occupants ? "occupied" : ""}`} key={index}>
+                <span className={`desk-monitor ${!config.devicesEnabled ? "inactive" : devicesDrawingLoad ? "active" : "idle"}`} />
+                <span className="person"><i /><b /></span>
+              </div>
+            ))}
+          </div>
+
+          {edgeNodeTelemetry ? (
+            <div className={`edge-node-sensor freshness-${edgeNodeFreshness ?? "no-recent-data"}`}>
+              <i /><span />
+            </div>
+          ) : null}
+        </div>
 
         <div className={`outside-condition${temperatureFeedback ? " twin-state-feedback" : ""}`} key={`outside-${temperatureFeedback ? feedbackToken : 0}`}>
           <span>Outdoor input</span>
@@ -143,32 +210,9 @@ export function ClassroomTwin({ config, result, highlightedItems = [], causalFoc
         ) : null}
 
         <div className="thermal-guide" aria-hidden="true"><span>OUTSIDE</span><i /><b>ROOM TARGET</b></div>
-        <div className="window" aria-hidden="true"><span /><i /><i /></div>
-
-        <div className={`ceiling-lights${lightingFeedback ? " twin-state-feedback" : ""}${lightingCausalFocus ? " twin-causal-target" : ""}`} key={`lighting-${lightingFeedback ? feedbackToken : 0}`}>
-          <span className="lighting-state-label">Lighting <b>{lightingStateLabel}</b></span>
-          {[0, 1, 2].map((light) => <i className="ceiling-light" aria-hidden="true" key={light}><b /></i>)}
-        </div>
-
-        <div className={`hvac-assembly${hvacFeedback ? " twin-state-feedback" : ""}${hvacCausalFocus ? " twin-causal-target" : ""}`} key={`hvac-${hvacFeedback ? feedbackToken : 0}`}>
-          <div className={`hvac-unit ${hvacState}${hvacDrawingLoad ? " active" : hvacState === "off" ? " inactive" : ""}`}><span>≋</span><small>HVAC</small><b>{hvacState.toUpperCase()}</b></div>
-          <svg className={`airflow-paths ${hvacState} ${hvacDrawingLoad ? "active" : "inactive"}`} aria-hidden="true" viewBox="0 0 380 100" preserveAspectRatio="none">
-            <path d="M374 14 C318 15 326 58 255 55 S153 22 84 53 S28 76 5 67" />
-            <path d="M374 31 C330 38 318 79 248 73 S151 44 93 70 S33 91 8 84" />
-            <path d="M374 48 C337 54 314 93 258 91 S175 65 121 86" />
-          </svg>
-        </div>
+        <span className={`lighting-state-label${lightingFeedback ? " twin-state-feedback" : ""}`}>Lighting <b>{lightingStateLabel}</b></span>
 
         <div className={`thermostat${temperatureFeedback ? " twin-state-feedback" : ""}${hvacCausalFocus ? " twin-causal-target" : ""}`} key={`target-${temperatureFeedback ? feedbackToken : 0}`}><span>ROOM TARGET</span><b><AnimatedNumber value={config.thermostatTemperatureC} maximumFractionDigits={1} />°C</b></div>
-
-        <div className={`desks${occupancyFeedback ? " twin-state-feedback" : ""}`} aria-hidden="true" key={`occupancy-${occupancyFeedback ? feedbackToken : 0}`}>
-          {Array.from({ length: 12 }, (_, index) => (
-            <div className={`desk ${index < occupants ? "occupied" : ""}`} key={index}>
-              <span className={`desk-monitor ${!config.devicesEnabled ? "inactive" : devicesDrawingLoad ? "active" : "idle"}`} />
-              <span className="person"><i /><b /></span>
-            </div>
-          ))}
-        </div>
 
         <div className={`device-bank ${!config.devicesEnabled ? "inactive" : devicesDrawingLoad ? "active" : "idle"}${devicesFeedback ? " twin-state-feedback" : ""}${devicesCausalFocus ? " twin-causal-target" : ""}`} key={`devices-${devicesFeedback ? feedbackToken : 0}`}>
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5" /><path d="M9 20h6M12 16v4" /></svg></span>
