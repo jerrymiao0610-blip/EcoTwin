@@ -20,7 +20,7 @@ EcoTwin follows one end-to-end decision loop:
 
 **Physical world → edge node and real-world context → Digital Twin → simulate → optimize → recommend → impact → grounded AI explanation**
 
-Users can configure a classroom, load current reference weather, connect real indoor telemetry, explore a what-if event, and compare three clearly named states:
+Users can configure a classroom, load Shanghai reference weather, connect real indoor telemetry, explore a what-if event, and compare three clearly named states:
 
 1. **Current** — the present modeled classroom.
 2. **What-if** — the scenario without an EcoTwin response.
@@ -34,16 +34,18 @@ EcoTwin is more than a dashboard or calculator. It maintains an explicit link be
 
 The classroom twin combines its definition, operating state, and environmental context in an immutable snapshot. The Arduino-based EcoTwin Edge Node supplies measured indoor temperature and relative humidity when sensor mode is activated; Open-Meteo supplies outdoor context. EcoTwin then uses the same deterministic decision pipeline to test changes without changing the real classroom first.
 
+The Living Classroom Digital Twin uses perspective and layered depth while keeping telemetry crisp and readable. State-driven HVAC airflow, environmental lighting, occupancy, device activity, and real Edge Node telemetry represent the modeled physical space. Current and what-if views stay inside the same classroom, with each visual update following deterministic model state.
+
 ## Core Capabilities
 
-- **Living classroom Digital Twin** — represents classroom geometry, occupancy, schedules, controls, equipment, environmental context, and snapshot provenance.
+- **Living classroom Digital Twin** — presents classroom geometry, occupancy, schedules, controls, equipment, environmental context, and snapshot provenance in a spatial, perspective-based scene.
 - **Deterministic energy simulation** — models bidirectional heating and cooling, lighting, device loads, occupant sensible heat, operating schedules, electricity, CO₂, and electricity cost.
 - **What-if scenarios** — includes **Heatwave Tomorrow**, **Empty Classroom**, and **Eco Mode** with explicit parameter changes and comparison evidence.
 - **Constrained optimizer** — searches thermostat, lighting, and device-allowance settings inside visible classroom-service limits. The default search keeps the thermostat at 20–26 °C, lighting at 60–100%, and device allowance at 40–100 W per occupant; it cannot “win” by turning everything off.
 - **Current → What-if → EcoTwin Response comparison** — separates the untreated scenario from the response so savings always have a clear comparison basis.
 - **Impact analysis** — reports modeled energy saved, emissions avoided, cost saved, percentage change, and component contribution from HVAC, lighting, and devices.
 - **Grounded explanation** — production uses Cloudflare Workers AI to explain structured EcoTwin evidence. Numerical results remain deterministic source data, provider output is validated, and unavailable or invalid provider responses fall back to deterministic summaries.
-- **Environmental context** — Open-Meteo can provide current outdoor temperature, relative humidity, and surface pressure for the Shanghai reference location. A failed request falls back explicitly to the active manual outdoor temperature.
+- **Environmental context** — Open-Meteo can provide outdoor temperature, relative humidity, and surface pressure for the Shanghai reference location. A failed request falls back explicitly to the active manual outdoor temperature.
 - **Sensor-informed mode** — combines measured indoor temperature and RH with outdoor context, target temperature, target RH, and a transparent psychrometric HVAC estimate.
 
 > **The numbers come from EcoTwin. AI explains them.**
@@ -92,19 +94,21 @@ At a high level:
 
 The daily result is a **sensor-informed modeled estimate** for the captured indoor state and current outdoor conditions. It is not measured electricity consumption. Monthly and yearly values are illustrative same-condition extrapolations; they repeat the same weather and initial indoor-state recovery for each operating day, so they are not weather-normalized forecasts.
 
+This humidity-aware path is a separate current-condition model; EcoTwin does not present it as humidity integration across the what-if scenario and optimizer paths.
+
 The principal constants are documented in [Modeling Assumptions](#modeling-assumptions).
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    PW[Physical World] --> EN[EcoTwin Edge Node]
-    PW --> OM[Open-Meteo]
-    EN --> EC[Environmental Context]
-    OM --> EC
+    subgraph RW[Real-world context]
+        EN[Arduino Edge Node<br/>indoor T + RH]
+        OM[Open-Meteo<br/>outdoor T + RH + pressure]
+    end
 
-    subgraph DET[Deterministic computation — numerical source of truth]
-        EC --> DT[Digital Twin]
+    subgraph DET[Deterministic Decision Twin — numerical source of truth]
+        DT[Immutable classroom snapshot]
         DT --> PE[Physics Engine]
         PE --> WI[What-if Engine]
         PE --> OP[Constrained Optimizer]
@@ -113,12 +117,36 @@ flowchart TD
         DP --> IA[Impact Analysis]
     end
 
-    DP -. structured evidence .-> AI[Grounded AI Explanation — prose only]
+    subgraph SENSOR[Sensor-informed current-condition model]
+        CC[Indoor T/RH + outdoor T/RH/pressure]
+        CC --> PSY[Psychrometrics]
+        PSY --> HVAC[Sensible + latent HVAC estimate]
+    end
+
+    subgraph PRESENT[Presentation]
+        SP[Spatial classroom Twin<br/>perspective + layered HTML/SVG/CSS]
+    end
+
+    subgraph EXPLAIN[Grounded AI explanation]
+        AI[Cloudflare Workers AI — prose only]
+        FB[Deterministic Evidence Summary]
+        AI -. provider failure .-> FB
+    end
+
+    OM --> DT
+    EN --> CC
+    OM --> CC
+    EN -. local telemetry .-> SP
+    DT -. modeled classroom state .-> SP
+    DP -. scenario and response state .-> SP
+    HVAC -. current-condition state .-> SP
+    DP -. structured evidence .-> AI
     IA -. validated impacts .-> AI
-    AI -. provider failure .-> FB[Deterministic Evidence Summary]
 ```
 
 The application is written with Next.js, React, TypeScript, and Tailwind CSS. Deterministic simulation, optimization, scenario, impact, decision, and presentation contracts are isolated from provider adapters. Open-Meteo provides weather context; Cloudflare Workers AI provides production explanation prose; Arduino and Web Serial provide the optional physical sensing layer. Vitest covers the analytical and integration behavior, and Vercel hosts the production application.
+
+The spatial classroom Twin is a lightweight presentation layer built with CSS perspective, CSS 3D transforms, layered HTML/SVG/CSS scene geometry, and restrained pointer parallax. It keeps telemetry in a crisp overlay, includes responsive and reduced-motion fallbacks, and visualizes model outputs without recalculating them.
 
 ## Modeling Assumptions
 
@@ -167,7 +195,7 @@ EcoTwin includes:
 - responsive layouts, keyboard-accessible controls, visible focus states, and reduced-motion support;
 - automated unit, integration, release-flow, API-route, and server-rendered component tests.
 
-The current release passes **242 automated tests across 35 test files**; see [Testing](#testing) for the exact verification commands.
+The current release passes **245 automated tests across 35 test files**; see [Testing](#testing) for the exact verification commands.
 
 ## Running Locally
 
