@@ -8,6 +8,24 @@ EcoTwin connects real-world environmental context to a living classroom model, s
 
 [Live Demo](https://ecotwin-ncwzid.vercel.app) · [GitHub Repository](https://github.com/jerrymiao0610-blip/EcoTwin) · [Edge Node Setup](hardware/arduino/README.md)
 
+## Frequently Asked Questions
+
+**What optimizer does EcoTwin use?**
+
+A transparent, deterministic grid search over a bounded parameter space (455 combinations for the default demo classroom). It is not a black-box ML optimizer — every candidate and every constraint is traceable.
+
+**How is the physics model validated?**
+
+EcoTwin is an educational thermal model (envelope heat transfer, occupant sensible heat, and a COP-based HVAC estimate) with explicit assumptions — not CFD and not certified building-energy software. The 245 automated tests verify that the computation is correct and reproducible, not that it predicts a specific real building.
+
+**What happens if the sensor fails?**
+
+The Edge Node uses protocol validation, stale-telemetry detection, disconnect recovery, and an explicit fallback to manual mode. EcoTwin never presents old measurements as current data.
+
+**How does EcoTwin scale beyond one classroom?**
+
+The simulation, optimizer, and impact layers are all configuration-driven. The current demo is classroom-scale; the product direction is Classroom → Building → Campus → Portfolio.
+
 ## The Problem
 
 Building-energy decisions are often reactive. Operators can change a thermostat, lighting level, or equipment policy, but they cannot safely see the combined energy, emissions, cost, and comfort consequences before those changes affect the physical space.
