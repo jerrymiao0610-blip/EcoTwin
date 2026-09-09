@@ -1936,3 +1936,51 @@ button:active { transform: scale(.97); }
   .spatial-room .lighting-state-label { border-width: 2px; }
   .spatial-room .twin-telemetry-grid { opacity: .25; }
 }
+
+/* ============================================================
+   UI polish — non-linear motion + regular module surfaces
+   (append-only; no existing rules are modified)
+   ============================================================ */
+
+:root {
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --radius-module: 12px;
+}
+
+/* Consistent surface radius across the primary modules */
+.metric-card,
+.derived-metrics,
+.controls-panel,
+.explanation-panel,
+.twin-system,
+.decision-workspace {
+  border-radius: var(--radius-module);
+}
+
+/* Springy micro-motion for interactive elements */
+.toggle::after {
+  transition: transform 0.28s var(--ease-spring);
+}
+
+.scenario-option label {
+  transition:
+    color 0.2s var(--ease-emphasized),
+    background-color 0.2s var(--ease-emphasized),
+    border-color 0.2s var(--ease-emphasized),
+    transform 0.16s var(--ease-spring);
+}
+
+.scenario-option label:hover {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle::after,
+  .scenario-option label {
+    transition: none !important;
+  }
+  .scenario-option label:hover {
+    transform: none !important;
+  }
+}
