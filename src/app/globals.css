@@ -1033,6 +1033,14 @@ button:active { transform: scale(.97); }
 .twin-focus-annunciator.scenario-active span,
 .twin-focus-annunciator.scenario-active strong { color: #245e52; }
 
+/* Scenario labels are longer than the Current-state label. Drop them below
+   the room label row so they never cover the occupancy ("people") text. */
+@media (min-width: 641px) {
+  .twin-focus-annunciator.scenario-active {
+    top: 27px;
+  }
+}
+
 .scenario-snapshot .scenario-description { margin: 10px 0 0; color: #b3cec5; font-size: 8px; line-height: 1.42; }
 .scenario-snapshot .snapshot-delta { padding-top: 12px; }
 .scenario-snapshot .scenario-neutral-result { max-width: 210px; font-family: var(--font-geist-sans), Arial, sans-serif; font-size: 21px; font-weight: 650; letter-spacing: -.3px; line-height: 1.1; }

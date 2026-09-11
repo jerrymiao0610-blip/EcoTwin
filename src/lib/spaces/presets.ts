@@ -48,6 +48,7 @@ export const SPACE_PRESETS: Readonly<Record<SpaceTypeId, SpacePreset>> = {
       lightingPowerDensityWPerM2: 9,
       devicePowerW: 1_920,
       ...SHARED_CONTEXT,
+      operatingDaysPerYear: 260, // typical office work-year
     },
   },
   gymnasium: {
@@ -63,6 +64,7 @@ export const SPACE_PRESETS: Readonly<Record<SpaceTypeId, SpacePreset>> = {
       lightingPowerDensityWPerM2: 10,
       devicePowerW: 600,
       ...SHARED_CONTEXT,
+      operatingDaysPerYear: 312, // gym open most days of the year
     },
   },
 };

@@ -9,6 +9,7 @@ import {
   SPACE_PRESET_IDS,
   getSpacePreset,
 } from "./presets";
+import { simulateScenario } from "../scenarios/scenarios";
 
 describe("space presets", () => {
   it("declares a unique preset for each id in stable order", () => {
@@ -29,5 +30,17 @@ describe("space presets", () => {
 
   it("uses the established classroom default for the classroom preset", () => {
     expect(SPACE_PRESETS.classroom.config).toEqual(DEFAULT_CLASSROOM_CONFIG);
+  });
+
+  it("keeps occupancy-driven annual scenario impact distinct across spaces", () => {
+    const annualSavings = SPACE_PRESET_IDS.map((id) => {
+      const result = simulateScenario(
+        SPACE_PRESETS[id].config,
+        "empty-classroom",
+      );
+      return result.comparison.annualEnergyKWhDelta;
+    });
+
+    expect(new Set(annualSavings).size).toBe(SPACE_PRESET_IDS.length);
   });
 });
