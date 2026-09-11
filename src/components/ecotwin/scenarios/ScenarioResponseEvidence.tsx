@@ -1,4 +1,5 @@
 import type { TwinSystemFocus } from "../ClassroomTwin";
+import type { ImpactReport } from "@/lib/impact/types";
 import type { ScenarioResponseModel } from "@/lib/workspace/scenarioResponseTypes";
 import { AnimatedNumber } from "../AnimatedNumber";
 import { RecommendationCard } from "../workspace/RecommendationCard";
@@ -9,6 +10,7 @@ import {
 
 interface ScenarioResponseEvidenceProps {
   model: Readonly<ScenarioResponseModel>;
+  scenarioImpact: Readonly<ImpactReport>;
   onTwinFocusChange?: (system: TwinSystemFocus | null) => void;
 }
 
@@ -24,6 +26,7 @@ const responseParameterLabels: Readonly<Record<string, string>> = {
 /** Complete trace for the scenario-specific DecisionPackage presentation model. */
 export function ScenarioResponseEvidence({
   model,
+  scenarioImpact,
   onTwinFocusChange,
 }: ScenarioResponseEvidenceProps) {
   const source = model.evidence.sourceScenario;
@@ -69,21 +72,21 @@ export function ScenarioResponseEvidence({
         </section>
 
         <section aria-labelledby="response-impact-title">
-          <h3 id="response-impact-title">Modeled impact</h3>
+          <h3 id="response-impact-title">Modeled impact vs current</h3>
           <dl className="response-impact-list">
-            <div><dt>Daily energy</dt><dd>{describeImpactChange(model.impact.energyKWh.daily, "kWh")}</dd></div>
-            <div><dt>Daily CO₂</dt><dd>{describeImpactChange(model.impact.co2Kg.daily, "kg")}</dd></div>
-            <div><dt>Daily cost</dt><dd>{describeImpactChange(model.impact.cost.daily, "$")}</dd></div>
-            <div><dt>Annual energy</dt><dd>{describeImpactChange(model.annualImpact.energyKWh, "kWh")}</dd></div>
-            <div><dt>Annual CO₂</dt><dd>{describeImpactChange(model.annualImpact.co2Kg, "kg")}</dd></div>
-            <div><dt>Annual cost</dt><dd>{describeImpactChange(model.annualImpact.cost, "$")}</dd></div>
+            <div><dt>Daily energy</dt><dd>{describeImpactChange(scenarioImpact.energyKWh.daily, "kWh")}</dd></div>
+            <div><dt>Daily CO₂</dt><dd>{describeImpactChange(scenarioImpact.co2Kg.daily, "kg")}</dd></div>
+            <div><dt>Daily cost</dt><dd>{describeImpactChange(scenarioImpact.cost.daily, "$")}</dd></div>
+            <div><dt>Annual energy</dt><dd>{describeImpactChange(scenarioImpact.energyKWh.annual, "kWh")}</dd></div>
+            <div><dt>Annual CO₂</dt><dd>{describeImpactChange(scenarioImpact.co2Kg.annual, "kg")}</dd></div>
+            <div><dt>Annual cost</dt><dd>{describeImpactChange(scenarioImpact.cost.annual, "$")}</dd></div>
           </dl>
         </section>
 
         <section aria-labelledby="response-components-title">
           <h3 id="response-components-title">Component contribution</h3>
           <dl className="response-component-list">
-            {model.impact.components.map((component) => (
+            {scenarioImpact.components.map((component) => (
               <div key={component.component}>
                 <dt>{componentLabel(component.component)}</dt>
                 <dd>{describeImpactChange(component.energyKWh, "kWh/day")}</dd>

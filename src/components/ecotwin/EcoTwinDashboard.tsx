@@ -22,6 +22,11 @@ import {
 } from "@/lib/sensor-simulation";
 import { DEFAULT_CLASSROOM_CONFIG, type ClassroomConfig } from "@/lib/simulation";
 import { normalizeClassroomConfigEdit } from "@/lib/validation/classroomConfig";
+import {
+  SPACE_PRESETS,
+  SPACE_PRESET_IDS,
+  type SpacePreset,
+} from "@/lib/spaces/presets";
 import { buildScenarioWorkspaceModels } from "@/lib/workspace/buildScenarioWorkspace";
 import { buildScenarioResponse } from "@/lib/workspace/buildScenarioResponse";
 import { buildWorkspace } from "@/lib/workspace/buildWorkspace";
@@ -41,7 +46,9 @@ import { ScenarioResponseEvidence } from "./scenarios/ScenarioResponseEvidence";
 import { ScenarioResponseSnapshot } from "./scenarios/ScenarioResponseSnapshot";
 import { ScenarioSelector, type ScenarioSelectionId } from "./scenarios/ScenarioSelector";
 import { TwinJourneyRail } from "./TwinJourneyRail";
+import { SpaceTypeSelector, type SpaceTypeSelection } from "./spaces/SpaceTypeSelector";
 import { DecisionWorkspace } from "./workspace/DecisionWorkspace";
+import { ScaleExtrapolation } from "./workspace/ScaleExtrapolation";
 
 const periodLabels = { daily: "per day", monthly: "per month", annual: "per year" } as const;
 type FeedbackKey = keyof ClassroomConfig | "period" | "reset" | "scenario" | null;
@@ -74,6 +81,13 @@ export function EcoTwinDashboard() {
   const lastSensorComputedAtMs = useRef<number | null>(null);
   const lastSensorInputsKey = useRef<string | null>(null);
   const edgeNode = useEdgeNodeSerial();
+  const spaceTypeId = useMemo<SpaceTypeSelection>(() => {
+    const match = SPACE_PRESET_IDS.find(
+      (id) =>
+        JSON.stringify(SPACE_PRESETS[id].config) === JSON.stringify(config),
+    );
+    return match ?? "custom";
+  }, [config]);
   const { result, workspace } = useMemo(() => {
     const decision = runDecisionPipeline(config);
 
@@ -156,6 +170,11 @@ export function EcoTwinDashboard() {
     setSensorDataStale(false);
     setSensorResult(null);
     setSensorModeWarning(null);
+    triggerFeedback("reset");
+  };
+  const selectSpaceType = (preset: SpacePreset) => {
+    setCausalFocus(null);
+    setConfig({ ...preset.config });
     triggerFeedback("reset");
   };
 
@@ -356,6 +375,7 @@ export function EcoTwinDashboard() {
       </header>
 
       <TwinJourneyRail />
+      <SpaceTypeSelector activeId={spaceTypeId} onSelect={selectSpaceType} />
 
       <section className={`mission-stage ${activeScenario ? "scenario-mission-stage" : ""}`} aria-label="Classroom digital twin mission view">
         <div className="real-world-stage">
@@ -389,7 +409,23 @@ export function EcoTwinDashboard() {
       />
 
       {activeScenarioResponse ? <ScenarioResponseSnapshot model={activeScenarioResponse} /> : null}
-      {activeScenarioResponse ? <ScenarioResponseEvidence model={activeScenarioResponse} onTwinFocusChange={setCausalFocus} /> : null}
+      {activeScenario && activeScenarioResponse ? (
+        <ScenarioResponseEvidence
+          model={activeScenarioResponse}
+          scenarioImpact={activeScenario.impact}
+          onTwinFocusChange={setCausalFocus}
+        />
+      ) : null}
+      {activeScenario ? (
+        <ScaleExtrapolation
+          annualImpact={{
+            energyKWh: activeScenario.impact.energyKWh.annual,
+            co2Kg: activeScenario.impact.co2Kg.annual,
+            cost: activeScenario.impact.cost.annual,
+          }}
+          scenarioId={activeScenario.id}
+        />
+      ) : null}
       {activeScenario && activeScenarioResponse ? (
         <GroundedExplanation
           mode="scenario"

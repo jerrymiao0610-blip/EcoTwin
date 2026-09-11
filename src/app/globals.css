@@ -1984,3 +1984,247 @@ button:active { transform: scale(.97); }
     transform: none !important;
   }
 }
+
+/* ============================================================
+   Space type selector + impact-at-scale (append-only)
+   ============================================================ */
+
+.space-type-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 13px 0 2px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-module, 12px);
+  background: #fbfdfb;
+}
+
+.space-type-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.space-type-heading small {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.space-type-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.space-type-options button {
+  display: grid;
+  gap: 1px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  transition:
+    border-color 0.18s var(--ease-emphasized, ease),
+    background-color 0.18s var(--ease-emphasized, ease),
+    transform 0.14s var(--ease-spring, ease);
+}
+
+.space-type-options button strong {
+  font-size: 12px;
+}
+
+.space-type-options button small {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 550;
+}
+
+.space-type-options button:hover {
+  transform: translateY(-1px);
+}
+
+.space-type-options button.active {
+  border-color: #3f7d71;
+  background: #e8f4ef;
+  color: var(--deep);
+}
+
+.space-type-options button.active small {
+  color: #315e56;
+}
+
+.scale-extrapolation {
+  margin: 18px 0;
+  overflow: hidden;
+  border: 1px solid #a9c9bf;
+  border-radius: var(--radius-module, 12px);
+  background: #fff;
+  box-shadow: 0 10px 30px #173f3510;
+}
+
+.scale-extrapolation-header {
+  padding: 16px 18px 12px;
+}
+
+.scale-extrapolation-header h2 {
+  margin: 3px 0 4px;
+  font-family: Georgia, serif;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+
+.scale-extrapolation-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.scale-controls {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 14px;
+}
+
+.scale-controls input[type="range"] {
+  width: 100%;
+  height: 4px;
+  accent-color: #3b8274;
+}
+
+.scale-presets {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.scale-presets button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: #f3f7f4;
+  color: #3f5f58;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.scale-presets button.active {
+  border-color: var(--deep);
+  background: var(--deep);
+  color: #eaf7f0;
+}
+
+.scale-readout {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid #e1e8e4;
+}
+
+.scale-metric {
+  display: grid;
+  gap: 3px;
+  padding: 13px 14px;
+  min-width: 0;
+}
+
+.scale-metric + .scale-metric {
+  border-left: 1px solid #e1e8e4;
+}
+
+.scale-value {
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scale-label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .space-type-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .space-type-options {
+    justify-content: flex-start;
+  }
+  .scale-readout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .scale-metric:nth-child(odd) + .scale-metric {
+    border-left: 0;
+  }
+  .scale-metric:nth-child(n + 3) {
+    border-top: 1px solid #e1e8e4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space-type-options button {
+    transition: none !important;
+  }
+  .space-type-options button:hover {
+    transform: none !important;
+  }
+}
+
+/* Eco Mode savings emphasis — a one-shot pop on the money saved metric. */
+.scale-metric-cost.eco-savings-emphasized {
+  animation: eco-savings-pop 0.9s var(--ease-spring, ease) 1;
+}
+
+.scale-metric-cost.eco-savings-emphasized .scale-value {
+  color: #1d7a5a;
+}
+
+/* Additional-load scenarios are presented in an amber warning tone. */
+.scale-readout.scale-added .scale-value {
+  color: #a17838;
+}
+
+@keyframes eco-savings-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scale-metric-cost.eco-savings-emphasized {
+    animation: none !important;
+  }
+}
+
+/* Align the Real-world context (Edge Node) header with the Operating
+   condition (scenario selector) header: match the card padding and offset
+   the eyebrow/title to line up with the mission-index circle. */
+.edge-node-panel {
+  padding: 16px;
+}
+
+.edge-node-panel > header {
+  padding-left: 37px;
+}
